@@ -695,7 +695,46 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
             intervals.add(evidenceIterator2.next().getLocation());
         }
 
+        evidenceRDD.unpersist();
+
         return intervals;
+    }
+
+    static class EvidenceTargetLink {
+        SVInterval source;
+        SVInterval target;
+        double directedWeight;
+        double undirectedWeight;
+    }
+
+    private static List<BreakpointEvidence> collectAllEvidence( final JavaRDD<BreakpointEvidence> evidenceRDD,
+                                                                final int nContigs,
+                                                                final Broadcast<ReadMetadata> broadcastMetadata,
+                                                                final int minEvidenceWeight,
+                                                                final int minCoherentEvidenceWeight ) {
+        // replace clumps of evidence from reads with a single aggregate indicator of evidence (to save memory), except
+        // don't clump anything within two fragment lengths of a partition boundary.
+        // collect the whole mess in the driver.
+        final int maxFragmentSize = broadcastMetadata.value().getMaxMedianFragmentSize();
+        final List<BreakpointEvidence> allEvidence =
+                evidenceRDD
+                        .mapPartitionsWithIndex( (idx, readEvidenceItr) ->
+                                new FlatMapGluer<>(
+                                        new BreakpointEvidenceClusterer(maxFragmentSize,
+                                                new PartitionCrossingChecker(idx,broadcastMetadata.value(),2*maxFragmentSize)),
+                                        readEvidenceItr,
+                                        new BreakpointEvidence(new SVInterval(nContigs,1,1),0,false)), true)
+                        .collect();
+
+        // reapply the density filter (all data collected -- no more worry about partition boundaries).
+        Iterator<BreakpointEvidence> evidenceIterator =
+                new BreakpointDensityFilter(allEvidence.iterator(), broadcastMetadata.value(),
+                        minEvidenceWeight, minCoherentEvidenceWeight, new PartitionCrossingChecker());
+        List<BreakpointEvidence> filteredEvidence = new ArrayList<>(allEvidence.size());
+        while ( evidenceIterator.hasNext() ) {
+            filteredEvidence.add(evidenceIterator.next());
+        }
+        return filteredEvidence;
     }
 
     private static void log(final String message, final Logger logger) {
