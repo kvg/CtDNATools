@@ -1,15 +1,13 @@
 package org.broadinstitute.hellbender.tools.spark.sv;
 
 import htsjdk.samtools.SAMFileHeader;
+import org.broadinstitute.hellbender.utils.IntHistogramTest;
 import org.broadinstitute.hellbender.utils.read.ArtificialReadUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 import static org.testng.Assert.*;
 
@@ -25,8 +23,8 @@ public class EvidenceTargetLinkClustererTest {
         partitionBounds[0] = new ReadMetadata.PartitionBounds(0, 1, 0, 10000);
         partitionBounds[1] = new ReadMetadata.PartitionBounds(0, 10001, 0, 20000);
         partitionBounds[2] = new ReadMetadata.PartitionBounds(0, 20001, 0, 30000);
-        return new ReadMetadata(new HashSet<>(), artificialSamHeader,
-                new ReadMetadata.LibraryFragmentStatistics(350, 40, 40),
+        return new ReadMetadata(Collections.emptySet(), artificialSamHeader,
+                new FragmentLengthStatistics(IntHistogramTest.genLogNormalSample(350, 40, 10000)),
                 partitionBounds, 100, 10, 30);
     }
 
@@ -45,15 +43,15 @@ public class EvidenceTargetLinkClustererTest {
 
         final List<EvidenceTargetLink> linkList = new ArrayList<>();
         linkList.add(new EvidenceTargetLink(
-                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()), 1275 + pair2.get(0).getLength(), 1275 + readMetadata.getStatistics(pair2.get(0).getReadGroup()).getMedianFragmentSize()),
+                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()), 1275 + pair2.get(0).getLength(), 1275 + readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMedian()),
                 true,
-                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()), 600000 - readMetadata.getStatistics(pair2.get(0).getReadGroup()).getMedianFragmentSize(), 600000),
+                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()), 600000 - readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMedian(), 600000),
                 false, 0, 1));
 
         linkList.add(new EvidenceTargetLink(
-                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()), 1300 + pair3.get(0).getLength(), 1250 + readMetadata.getStatistics(pair1.get(0).getReadGroup()).getMedianFragmentSize()),
+                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()), 1300 + pair3.get(0).getLength(), 1250 + readMetadata.getFragmentLengthStatistics(pair1.get(0).getReadGroup()).getMedian()),
                 true,
-                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()), 500025 - readMetadata.getStatistics(pair2.get(0).getReadGroup()).getMedianFragmentSize(), 500000),
+                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()), 500025 - readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMedian(), 500000),
                 false, 0, 2));
 
         List<Object[]> tests = new ArrayList<>();
