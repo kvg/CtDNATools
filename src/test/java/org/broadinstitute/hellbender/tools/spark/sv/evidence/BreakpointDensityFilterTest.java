@@ -232,6 +232,7 @@ public class BreakpointDensityFilterTest extends BaseTest {
     }
 
     private BreakpointEvidence.ReadEvidence makeEvidence( final int start ) {
-        return new BreakpointEvidence.ReadEvidence(new SVInterval(0,start,start+100),1,"Test", TemplateFragmentOrdinal.UNPAIRED,false);
+        return new BreakpointEvidence.ReadEvidence(new SVInterval(0,start,start+100),1,
+                "Test", TemplateFragmentOrdinal.UNPAIRED,false, true);
     }
 }

@@ -39,7 +39,7 @@ public class BreakpointEvidenceTest extends BaseTest {
         final int uncertainty = (readMetadata.getGroupMedianFragmentSize(groupName)-readSize)/2;
         final int evidenceLocus = readStart - uncertainty;
         final BreakpointEvidence evidence2 =
-                new BreakpointEvidence.ReadEvidence(read, readMetadata, evidenceLocus, uncertainty);
+                new BreakpointEvidence.ReadEvidence(read, readMetadata, evidenceLocus, uncertainty, ! read.isReverseStrand());
         Assert.assertEquals(evidence1.getLocation(), new SVInterval(0,evidenceLocus-uncertainty,evidenceLocus+uncertainty));
         Assert.assertEquals(evidence1.getLocation().getLength(), 2*uncertainty);
         Assert.assertEquals(evidence1.getTemplateName(), templateName);
@@ -48,7 +48,7 @@ public class BreakpointEvidenceTest extends BaseTest {
         read.setIsReverseStrand(false);
         final BreakpointEvidence evidence3 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
         final BreakpointEvidence evidence4 =
-                new BreakpointEvidence.ReadEvidence(read, readMetadata, readStart+readSize+uncertainty, uncertainty);
+                new BreakpointEvidence.ReadEvidence(read, readMetadata, readStart+readSize+uncertainty, uncertainty, ! read.isReverseStrand());
         Assert.assertEquals(evidence3.toString(), evidence4.toString());
     }
 
