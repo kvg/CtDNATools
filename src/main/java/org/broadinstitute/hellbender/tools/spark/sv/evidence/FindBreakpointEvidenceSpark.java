@@ -695,67 +695,18 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
             intervals.add(evidenceIterator2.next().getLocation());
         }
 
-        final JavaRDD<EvidenceTargetLink> evidenceTargetLinkJavaRDD = evidenceRDD.mapPartitions(itr -> {
-            final ReadMetadata readMetadata = broadcastMetadata.getValue();
-
-            final List<EvidenceTargetLink> links = new ArrayList<>(intervals.size() / readMetadata.getNPartitions());
-            final SVIntervalTree<EvidenceTargetLink> currentIntervalsWithTargets = new SVIntervalTree<>();
-            while (itr.hasNext()) {
-                final BreakpointEvidence nextEvidence = itr.next();
-                if (nextEvidence.hasDistalTargets()) {
-                    EvidenceTargetLink updatedLink = new EvidenceTargetLink();
-                    for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.iterator(); it.hasNext(); ) {
-                        final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();
-                        final EvidenceTargetLink oldLink = sourceIntervalEntry.getValue();
-                        if (nextEvidence.getLocation().overlaps(sourceIntervalEntry.getInterval())
-                                && strandsMatch(nextEvidence.isForwardStrand(), sourceIntervalEntry.getValue().sourceForwardStrand)) {
-                            // todo: what to do if there are more than one distal targets
-                            if (nextEvidence.hasDistalTargets()) {
-                                updatedLink = new EvidenceTargetLink();
-                                if (nextEvidence.getDistalTargets(readMetadata).get(0).overlaps(oldLink.target) &&
-                                        strandsMatch(nextEvidence.getDistalTargetStrands().get(0), oldLink.targetForwardStrand)) {
-                                    // if it does, intersect the source and target intervals to refine the link
-                                    it.remove();
-                                    final SVInterval newSource = sourceIntervalEntry.getInterval().intersect(nextEvidence.getLocation());
-                                    final SVInterval newTarget = oldLink.target.intersect(nextEvidence.getDistalTargets(readMetadata).get(0));
-                                    updatedLink.source = newSource;
-                                    updatedLink.target = newTarget;
-                                    updatedLink.sourceForwardStrand = oldLink.sourceForwardStrand;
-                                    updatedLink.targetForwardStrand = oldLink.targetForwardStrand;
-                                    updatedLink.directedWeight = nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? oldLink.directedWeight : oldLink.directedWeight + 1;
-                                    updatedLink.undirectedWeight = nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? oldLink.undirectedWeight + 1 : oldLink.undirectedWeight;
-                                } else {
-                                    updatedLink.source = nextEvidence.getLocation();
-                                    updatedLink.sourceForwardStrand = nextEvidence.isForwardStrand();
-                                    updatedLink.target = nextEvidence.getDistalTargets(readMetadata).get(0);
-                                    updatedLink.targetForwardStrand = nextEvidence.getDistalTargetStrands().get(0);
-                                    updatedLink.directedWeight = nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? 0 : 1;
-                                    updatedLink.undirectedWeight = nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? 1 : 0;
-                                }
-                            }
-                        } else {
-                            links.add(oldLink);
-                            // create a new link
-                            it.remove();
-                        }
-                    }
-                    currentIntervalsWithTargets.put(updatedLink.source, updatedLink);
+        final int totalNumIntervals = intervals.size();
+        final JavaRDD<EvidenceTargetLink> evidenceTargetLinkJavaRDD = evidenceRDD.mapPartitions(
+                itr -> {
+                    final ReadMetadata readMetadata = broadcastMetadata.getValue();
+                    final EvidenceTargetLinkClusterer clusterer = new EvidenceTargetLinkClusterer(readMetadata, totalNumIntervals);
+                    return clusterer.call(itr);
                 }
-            }
-            for (Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.iterator(); it.hasNext(); ) {
-                links.add(it.next().getValue());
-            }
-            return links.iterator();
-        }).filter(link -> link.undirectedWeight > 2 || link.directedWeight > 0);
+                )
+                .filter(link -> link.undirectedWeight > 2 || link.directedWeight > 0);
 
         // todo: add the partition-edge links if any
         final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
-
-
 
 
         evidenceRDD.unpersist();
@@ -763,18 +714,6 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         return intervals;
     }
 
-    private static boolean strandsMatch(final Boolean forwardStrand1, final Boolean forwardStrand2) {
-        return forwardStrand1 != null && forwardStrand2 != null && forwardStrand1.equals(forwardStrand2);
-    }
-
-    static class EvidenceTargetLink {
-        SVInterval source;
-        boolean sourceForwardStrand;
-        SVInterval target;
-        boolean targetForwardStrand;
-        double directedWeight;
-        double undirectedWeight;
-    }
 
     private static List<BreakpointEvidence> collectAllEvidence( final JavaRDD<BreakpointEvidence> evidenceRDD,
                                                                 final int nContigs,
