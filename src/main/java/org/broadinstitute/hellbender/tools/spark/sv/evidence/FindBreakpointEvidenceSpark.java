@@ -57,6 +57,7 @@ import static org.broadinstitute.hellbender.tools.spark.sv.evidence.BreakpointEv
 public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
     private static final long serialVersionUID = 1L;
 
+    private static final Logger logger = LogManager.getLogger(FindBreakpointEvidenceSpark.class);
 
     @ArgumentCollection
     private final FindBreakpointEvidenceSparkArgumentCollection params =
@@ -599,7 +600,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
             final Broadcast<ReadMetadata> broadcastMetadata,
             final SAMFileHeader header,
             final JavaRDD<GATKRead> unfilteredReads,
-            final SVReadFilter filter ) {
+            final SVReadFilter filter) {
         // find all breakpoint evidence, then filter for pile-ups
         final int nContigs = header.getSequenceDictionary().getSequences().size();
         final int minEvidenceWeight = params.minEvidenceWeight;
@@ -700,14 +701,46 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                 itr -> {
                     final ReadMetadata readMetadata = broadcastMetadata.getValue();
                     final EvidenceTargetLinkClusterer clusterer = new EvidenceTargetLinkClusterer(readMetadata, totalNumIntervals);
-                    return clusterer.call(itr);
-                }
-                )
+                    return clusterer.cluster(itr);
+                })
                 .filter(link -> link.undirectedWeight > 2 || link.directedWeight > 0);
 
         // todo: add the partition-edge links if any
-        final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
 
+        final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
+        System.err.println("Collected " + evidenceTargetLinks.size() + " evidence target links");
+        evidenceTargetLinks.iterator().forEachRemaining(System.err::println);
+
+        // todo: if identical source intervals we should have a list in each entry
+        final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = new SVIntervalTree<>();
+
+        evidenceTargetLinks.stream().filter(link -> link.source.compareTo(link.target) < 0).forEach(link -> targetLinkSourceTree.put(link.source, link));
+
+        evidenceTargetLinks.stream().filter(link -> link.source.compareTo(link.target) >= 0).forEach(link -> {
+            final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> overlappers = targetLinkSourceTree.overlappers(link.target);
+            EvidenceTargetLink newLink = null;
+            while (overlappers.hasNext()) {
+                final SVIntervalTree.Entry<EvidenceTargetLink> entry = overlappers.next();
+                final EvidenceTargetLink existingLink = entry.getValue();
+                if (existingLink.source.overlaps(link.target) && existingLink.sourceForwardStrand == link.targetForwardStrand &&
+                        existingLink.target.overlaps(link.source) && existingLink.targetForwardStrand == link.sourceForwardStrand) {
+                    newLink = new EvidenceTargetLink(link.target.intersect(existingLink.source), link.targetForwardStrand,
+                            link.source.intersect(existingLink.target), link.sourceForwardStrand, link.directedWeight + existingLink.directedWeight,  link.undirectedWeight);
+                    overlappers.remove();
+                    break;
+                }
+            }
+            if (newLink != null) {
+                targetLinkSourceTree.put(newLink.source, newLink);
+            } else {
+                targetLinkSourceTree.put(link.target, new EvidenceTargetLink(link.target, link.targetForwardStrand, link.source, link.sourceForwardStrand, link.directedWeight, link.undirectedWeight));
+            }
+
+        });
+
+        System.err.println("After deduplication have " + targetLinkSourceTree.size() + " evidence target links");
+
+        targetLinkSourceTree.iterator().forEachRemaining(entry -> System.err.println(entry.getValue()));
 
         evidenceRDD.unpersist();
 

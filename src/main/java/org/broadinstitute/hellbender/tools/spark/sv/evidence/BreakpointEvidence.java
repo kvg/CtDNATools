@@ -229,7 +229,7 @@ public class BreakpointEvidence {
         }
 
         private static SVInterval restOfFragmentInterval( final GATKRead read, final ReadMetadata metadata ) {
-            final int templateLen = metadata.getGroupMedianFragmentSize(read.getReadGroup());
+            final int templateLen = metadata.getGroupMedianFragmentSize(read.getReadGroup()) + (int) metadata.getFragmentLengthStatistics(read.getReadGroup()).getPositiveMAD() * 3;
             int width;
             int start;
             if ( read.isReverseStrand() ) {
@@ -268,7 +268,8 @@ public class BreakpointEvidence {
         private final String tagSA;
 
         public SplitRead( final GATKRead read, final ReadMetadata metadata, final boolean atStart ) {
-            super(read, metadata, atStart ? read.getStart() : read.getEnd(), UNCERTAINTY, atStart == read.isReverseStrand());
+            // todo: if reads have multiple SA tags.. we should have two peices of evidence with the right strands
+            super(read, metadata, atStart ? read.getStart() : read.getEnd(), UNCERTAINTY, read.getCigar().isRightClipped());
             cigar = read.getCigar().toString();
             if ( cigar.isEmpty() ) throw new GATKException("Read has no cigar string.");
             if (read.hasAttribute(SA_TAG_NAME)) {
@@ -328,8 +329,9 @@ public class BreakpointEvidence {
                     if (values.length != 6) {
                         throw new GATKException("Could not parse SATag: "+ saString);
                     }
-                    final boolean forwardStrand = values[2].equals("+");
-                    supplementaryAlignmentStrands.add(forwardStrand);
+                    final Cigar cigar = TextCigarCodec.decode(values[3]);
+                    // if the SA is right clipped, the evidence is on the forward strand ---->|
+                    supplementaryAlignmentStrands.add( cigar.isRightClipped());
                 }
                 return supplementaryAlignmentStrands;
             } else {
@@ -346,12 +348,12 @@ public class BreakpointEvidence {
                 throw new GATKException("Could not parse SATag: "+ saString);
             }
             final String contigId = values[0];
-            final int pos = Integer.parseInt(values[1]);
+            final int pos = Integer.parseInt(values[1]) - 1;
             final Cigar cigar = TextCigarCodec.decode(values[3]);
 
             return new SVInterval( readMetadata.getContigID(contigId),
                     pos - UNCERTAINTY,
-                    pos + cigar.getPaddedReferenceLength() + UNCERTAINTY);
+                    pos + cigar.getPaddedReferenceLength() + UNCERTAINTY + 1);
 
         }
 
@@ -484,10 +486,17 @@ public class BreakpointEvidence {
             final int mateContigIndex = metadata.getContigID(read.getMateContig());
             final int mateStartPosition = read.getMateStart();
             final boolean mateReverseStrand = read.mateIsReverseStrand();
-            final int medianFragmentSize = metadata.getFragmentLengthStatistics(read.getReadGroup()).getMedian();
+            final int maxAllowableFragmentSize = metadata.getFragmentLengthStatistics(read.getReadGroup()).getMedian() + (int) metadata.getFragmentLengthStatistics(read.getReadGroup()).getPositiveMAD() * 3;
+            final int mateAlignmentLength;
+            // if the read has an MC attribute we don't have to assume the aligned read length of the mate
+            if (read.hasAttribute("MC")) {
+                mateAlignmentLength = TextCigarCodec.decode(read.getAttributeAsString("MC")).getPaddedReferenceLength();
+            } else {
+                mateAlignmentLength = read.getLength();
+            }
             return new SVInterval(mateContigIndex,
-                    mateReverseStrand ? mateStartPosition - medianFragmentSize : mateStartPosition + read.getLength(),
-                    mateReverseStrand ? mateStartPosition : mateStartPosition + read.getLength() + medianFragmentSize);
+                    mateReverseStrand ? mateStartPosition - maxAllowableFragmentSize + mateAlignmentLength : mateStartPosition + mateAlignmentLength,
+                    mateReverseStrand ? mateStartPosition + 1 : mateStartPosition + maxAllowableFragmentSize + 1);
         }
 
         protected boolean getMateForwardStrand(final GATKRead read) {
@@ -523,23 +532,6 @@ public class BreakpointEvidence {
                 return new InterContigPair(kryo, input);
             }
         }
-    }
-
-    /**
-     * Finds the coordinates implicated by the read's mate as being part of the breakpoint, ie. the coordinates
-     * to the 3' end of the mate, where the breakpoint might lie. Given that we don't have the actual mate read here,
-     * we make two small assumptions: first, that the length of the mate is equal to the length of the read we are looking at.
-     * Second, since we don't have the mate's CIGAR we can't actually compute the end coordinates of the mate alignment,
-     * which might be pushed away from where we think it is by a large indel.
-     */
-    private static SVInterval getMateTargetInterval(final GATKRead read, final ReadMetadata metadata) {
-        final int mateContigIndex = metadata.getContigID(read.getMateContig());
-        final int mateStartPosition = read.getMateStart();
-        final boolean mateReverseStrand = read.mateIsReverseStrand();
-        final int medianFragmentSize = metadata.getGroupMedianFragmentSize(read.getReadGroup());
-        return new SVInterval(mateContigIndex,
-                mateReverseStrand ? mateStartPosition - medianFragmentSize : mateStartPosition + read.getLength(),
-                mateReverseStrand ? mateStartPosition : mateStartPosition + read.getLength() + medianFragmentSize);
     }
 
     @DefaultSerializer(OutiesPair.Serializer.class)

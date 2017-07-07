@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public class EvidenceTargetLinkClusterer implements FlatMapFunction<Iterator<BreakpointEvidence>, EvidenceTargetLink> {
+public class EvidenceTargetLinkClusterer {
 
     private final ReadMetadata readMetadata;
     private final int totalNumIntervals;
@@ -16,13 +16,16 @@ public class EvidenceTargetLinkClusterer implements FlatMapFunction<Iterator<Bre
         this.totalNumIntervals = totalNumIntervals;
     }
 
-    @Override
-    public Iterator<EvidenceTargetLink> call(final Iterator<BreakpointEvidence> breakpointEvidenceIterator) throws Exception {
+    public Iterator<EvidenceTargetLink> cluster(final Iterator<BreakpointEvidence> breakpointEvidenceIterator) throws Exception {
         final List<EvidenceTargetLink> links = new ArrayList<>(totalNumIntervals / readMetadata.getNPartitions());
         final SVIntervalTree<EvidenceTargetLink> currentIntervalsWithTargets = new SVIntervalTree<>();
         while (breakpointEvidenceIterator.hasNext()) {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
             if (nextEvidence.hasDistalTargets()) {
+                final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
+                System.err.println("21" + "\t" + nextEvidence.getLocation().getStart() + "\t" + nextEvidence.getLocation().getEnd() +
+                        "\t" + "21" + "\t" + target.getStart() + "\t" + target.getEnd() + "\t"  +
+                        ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() + ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateEnd() + nextEvidence.hashCode() + "\t" + 1 + "\t" + (nextEvidence.isForwardStrand() ? "+" : "-") + "\t" + (nextEvidence.getDistalTargetStrands().get(0) ? "+" : "-"));
                 EvidenceTargetLink updatedLink = null;
                 for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.iterator(); it.hasNext(); ) {
                     final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();
