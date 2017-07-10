@@ -229,11 +229,28 @@ public class BreakpointEvidence {
         }
 
         private static SVInterval restOfFragmentInterval( final GATKRead read, final ReadMetadata metadata ) {
-            final int templateLen = metadata.getGroupMedianFragmentSize(read.getReadGroup()) + (int) metadata.getFragmentLengthStatistics(read.getReadGroup()).getPositiveMAD() * 3;
+            final int templateLen = metadata.getGroupMedianFragmentSize(read.getReadGroup()) + ((int) metadata.getFragmentLengthStatistics(read.getReadGroup()).getPositiveMAD()) * 3;
             int width;
             int start;
             if ( read.isReverseStrand() ) {
-                final int readStart = read.getStart();
+                // we can get a little more precise about the interval by checking to see if there are any leading mismatches
+                // in the read's alignment and trimming them off.
+                int leadingMismatches = 0;
+                if (read.hasAttribute("MD")) {
+                    final String mdString = read.getAttributeAsString("MD");
+                    final List<TextMDCodec.MDElement> mdElements = TextMDCodec.parseMDString(mdString);
+                    int idx = 0;
+                    while (idx < mdElements.size()) {
+                        TextMDCodec.MDElement mdElement = mdElements.get(idx);
+                        if (mdElement instanceof TextMDCodec.MatchMDElement && mdElement.getLength() > 0) {
+                            break;
+                        } else {
+                            leadingMismatches += mdElement.getLength();
+                        }
+                        idx = idx + 1;
+                    }
+                }
+                final int readStart = read.getStart() + leadingMismatches;
                 width = readStart - (read.getUnclippedEnd() + 1 - templateLen);
                 start = readStart - width;
                 if ( start < 1 ) {
@@ -241,7 +258,24 @@ public class BreakpointEvidence {
                     start = 1;
                 }
             } else {
-                final int readEnd = read.getEnd() + 1;
+                // we can get a little more precise about the interval by checking to see if there are any trailing mismatches
+                // in the read's alignment and trimming them off.
+                int trailingMismatches = 0;
+                if (read.hasAttribute("MD")) {
+                    final String mdString = read.getAttributeAsString("MD");
+                    final List<TextMDCodec.MDElement> mdElements = TextMDCodec.parseMDString(mdString);
+                    int idx = mdElements.size() - 1;
+                    while (idx >= 0) {
+                        TextMDCodec.MDElement mdElement = mdElements.get(idx);
+                        if (mdElement instanceof TextMDCodec.MatchMDElement && mdElement.getLength() > 0) {
+                            break;
+                        } else {
+                            trailingMismatches += mdElement.getLength();
+                        }
+                        idx = idx - 1;
+                    }
+                }
+                final int readEnd = read.getEnd() + 1 - trailingMismatches;
                 width = read.getUnclippedStart() + templateLen - readEnd;
                 start = readEnd;
             }
@@ -341,14 +375,14 @@ public class BreakpointEvidence {
 
         // todo: for now, taking the entire location of the supplementary alignment plus the uncertainty on each end
         // A better solution might be to find the location of the actual clip on the other end of the reference,
-        // but that would be significantly more complex and possibly computationally expensive
+        // but that would be significantly more complex and possibly computationally ex pensive
         private SVInterval saStringToSVInterval(final ReadMetadata readMetadata, final String saString) {
             final String[] values = saString.split(",", -1);
             if (values.length != 6) {
                 throw new GATKException("Could not parse SATag: "+ saString);
             }
             final String contigId = values[0];
-            final int pos = Integer.parseInt(values[1]) - 1;
+            final int pos = Integer.parseInt(values[1]);
             final Cigar cigar = TextCigarCodec.decode(values[3]);
 
             return new SVInterval( readMetadata.getContigID(contigId),
@@ -441,6 +475,11 @@ public class BreakpointEvidence {
         protected final SVInterval target;
         protected final boolean targetForwardStrand;
 
+        // even if we have access to and use the mate cigar, we still don't really know the exact breakpoint interval
+        // specified by the mate since there could be unclipped mismatches at the ends of the alignment. This constant
+        // tries to correct for that.
+        public static final int MATE_ALIGNMENT_LENGTH_UNCERTAINTY = 2;
+
         public DiscordantReadPairEvidence(final GATKRead read, final ReadMetadata metadata) {
             super(read, metadata);
             target = getMateTargetInterval(read, metadata);
@@ -495,8 +534,8 @@ public class BreakpointEvidence {
                 mateAlignmentLength = read.getLength();
             }
             return new SVInterval(mateContigIndex,
-                    mateReverseStrand ? mateStartPosition - maxAllowableFragmentSize + mateAlignmentLength : mateStartPosition + mateAlignmentLength,
-                    mateReverseStrand ? mateStartPosition + 1 : mateStartPosition + maxAllowableFragmentSize + 1);
+                    mateReverseStrand ? mateStartPosition - maxAllowableFragmentSize + mateAlignmentLength : mateStartPosition + mateAlignmentLength - MATE_ALIGNMENT_LENGTH_UNCERTAINTY,
+                    mateReverseStrand ? mateStartPosition + MATE_ALIGNMENT_LENGTH_UNCERTAINTY : mateStartPosition + maxAllowableFragmentSize);
         }
 
         protected boolean getMateForwardStrand(final GATKRead read) {

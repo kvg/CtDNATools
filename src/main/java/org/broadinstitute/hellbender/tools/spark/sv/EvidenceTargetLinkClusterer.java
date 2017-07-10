@@ -23,8 +23,8 @@ public class EvidenceTargetLinkClusterer {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
             if (nextEvidence.hasDistalTargets()) {
                 final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
-                System.err.println("21" + "\t" + nextEvidence.getLocation().getStart() + "\t" + nextEvidence.getLocation().getEnd() +
-                        "\t" + "21" + "\t" + target.getStart() + "\t" + target.getEnd() + "\t"  +
+                System.err.println("21" + "\t" + (nextEvidence.getLocation().getStart() - 1) + "\t" + nextEvidence.getLocation().getEnd() +
+                        "\t" + "21" + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() + "\t"  +
                         ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() + ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateEnd() + nextEvidence.hashCode() + "\t" + 1 + "\t" + (nextEvidence.isForwardStrand() ? "+" : "-") + "\t" + (nextEvidence.getDistalTargetStrands().get(0) ? "+" : "-"));
                 EvidenceTargetLink updatedLink = null;
                 for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.iterator(); it.hasNext(); ) {
