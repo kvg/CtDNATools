@@ -38,20 +38,28 @@ public class EvidenceTargetLinkClustererTest {
         final List<GATKRead> pair2 = ArtificialReadUtils.createPair(artificialSamHeader, "pair2", 151, 1275, 600000, true, false);
         evidenceList.add(new BreakpointEvidence.WeirdTemplateSize(pair2.get(0), readMetadata));
 
-        final List<GATKRead> pair3 = ArtificialReadUtils.createPair(artificialSamHeader, "pair2", 151, 1300, 500025, true, false);
+        final List<GATKRead> pair3 = ArtificialReadUtils.createPair(artificialSamHeader, "pair3", 151, 1300, 500025, true, false);
         evidenceList.add(new BreakpointEvidence.WeirdTemplateSize(pair3.get(0), readMetadata));
 
         final List<EvidenceTargetLink> linkList = new ArrayList<>();
         linkList.add(new EvidenceTargetLink(
-                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()), 1275 + pair2.get(0).getLength(), 1275 + readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMedian()),
+                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()),
+                        1275 + pair2.get(0).getLength(),
+                        1275 + readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMaxNonOutlierFragmentSize()),
                 true,
-                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()), 600000 - readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMedian(), 600000),
+                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()),
+                        600000 - readMetadata.getFragmentLengthStatistics(pair1.get(0).getReadGroup()).getMaxNonOutlierFragmentSize() + 151,
+                        600000 + BreakpointEvidence.DiscordantReadPairEvidence.MATE_ALIGNMENT_LENGTH_UNCERTAINTY),
                 false, 0, 1));
 
         linkList.add(new EvidenceTargetLink(
-                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()), 1300 + pair3.get(0).getLength(), 1250 + readMetadata.getFragmentLengthStatistics(pair1.get(0).getReadGroup()).getMedian()),
+                new SVInterval(readMetadata.getContigID(pair1.get(0).getContig()),
+                        1300 + pair3.get(0).getLength(),
+                        1250 + readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMaxNonOutlierFragmentSize()),
                 true,
-                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()), 500025 - readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMedian(), 500000),
+                new SVInterval(readMetadata.getContigID(pair1.get(1).getContig()),
+                        500025 - readMetadata.getFragmentLengthStatistics(pair2.get(0).getReadGroup()).getMaxNonOutlierFragmentSize() + 151,
+                        500000 + BreakpointEvidence.DiscordantReadPairEvidence.MATE_ALIGNMENT_LENGTH_UNCERTAINTY),
                 false, 0, 2));
 
         List<Object[]> tests = new ArrayList<>();

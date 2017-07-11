@@ -5,6 +5,9 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @DefaultSerializer(EvidenceTargetLink.Serializer.class)
 class EvidenceTargetLink {
     private static final SVInterval.Serializer intervalSerializer = new SVInterval.Serializer();
@@ -43,6 +46,21 @@ class EvidenceTargetLink {
 
         output.writeInt(directedWeight);
         output.writeInt(undirectedWeight);
+    }
+
+    public String toBedpeString(ReadMetadata readMetadata) {
+        final Map<Integer, String> contigIdToContigNameMap =
+                readMetadata.getContigNameMap().entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+        return contigIdToContigNameMap.get(source.getContig()) + "\t" + (source.getStart() - 1) + "\t" + source.getEnd() +
+                "\t" + contigIdToContigNameMap.get(target.getContig()) + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() +
+                "\t"  + getId(contigIdToContigNameMap) + "\t" +
+                (undirectedWeight + directedWeight) + "\t" + (sourceForwardStrand ? "+" : "-") + "\t" + (targetForwardStrand ? "+" : "-");
+    }
+
+    private String getId(final Map<Integer, String> contigIdToContigNameMap) {
+        return contigIdToContigNameMap.get(source.getContig()) + "_" + (source.getStart() - 1) + "_" + source.getEnd() +
+                "_" + contigIdToContigNameMap.get(target.getContig()) + "_" + (target.getStart() - 1) + "_" + target.getEnd() +
+                "_" + (sourceForwardStrand ? "P" : "M")  + (targetForwardStrand ? "P" : "M");
     }
 
     public static final class Serializer extends com.esotericsoftware.kryo.Serializer<EvidenceTargetLink> {

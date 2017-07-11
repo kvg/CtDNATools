@@ -708,9 +708,33 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         // todo: add the partition-edge links if any
 
         final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
-        System.err.println("Collected " + evidenceTargetLinks.size() + " evidence target links");
-        evidenceTargetLinks.iterator().forEachRemaining(System.err::println);
+        //evidenceTargetLinks.iterator().forEachRemaining(System.err::println);
+        final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = deduplicateTargetLinks(evidenceTargetLinks);
 
+        log("Collected " + targetLinkSourceTree.size() + " evidence target links", logger);
+
+        if ( params.targetLinkFile != null ) {
+            try (final OutputStreamWriter writer =
+                         new OutputStreamWriter(new BufferedOutputStream(BucketUtils.createFile(params.targetLinkFile)))) {
+                targetLinkSourceTree.iterator().forEachRemaining(entry -> {
+                    final String bedpeRecord = entry.getValue().toBedpeString(broadcastMetadata.getValue());
+                    try {
+                        writer.write(bedpeRecord + "\n");
+                    } catch (final IOException ioe) {
+                        throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
+                    }
+                });
+            } catch ( final IOException ioe ) {
+                throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
+            }
+        }
+
+        evidenceRDD.unpersist();
+
+        return intervals;
+    }
+
+    private static SVIntervalTree<EvidenceTargetLink> deduplicateTargetLinks(final List<EvidenceTargetLink> evidenceTargetLinks) {
         // todo: if identical source intervals we should have a list in each entry
         final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = new SVIntervalTree<>();
 
@@ -738,13 +762,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
 
         });
 
-        System.err.println("After deduplication have " + targetLinkSourceTree.size() + " evidence target links");
-
-        targetLinkSourceTree.iterator().forEachRemaining(entry -> System.err.println(entry.getValue()));
-
-        evidenceRDD.unpersist();
-
-        return intervals;
+        return targetLinkSourceTree;
     }
 
 

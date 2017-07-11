@@ -36,7 +36,7 @@ public class BreakpointEvidenceTest extends BaseTest {
         read.setIsReverseStrand(true);
         read.setReadGroup(groupName);
         final BreakpointEvidence.ReadEvidence evidence1 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-        final int evidenceWidth = (readMetadata.getFragmentLengthStatistics(groupName).getMedian() + ((int) readMetadata.getFragmentLengthStatistics(groupName).getPositiveMAD()) * 3) - readSize;
+        final int evidenceWidth = readMetadata.getFragmentLengthStatistics(groupName).getMaxNonOutlierFragmentSize() - readSize;
         // otherwise the test below will break as it is currently structured
         Assert.assertTrue(evidenceWidth % 2 == 0);
         final int uncertainty = evidenceWidth /2;
@@ -68,7 +68,7 @@ public class BreakpointEvidenceTest extends BaseTest {
         read.setIsReverseStrand(false);
         read.setReadGroup(groupName);
         final BreakpointEvidence.ReadEvidence evidence1 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-        final int evidenceWidth = (readMetadata.getFragmentLengthStatistics(groupName).getMedian() + ((int) readMetadata.getFragmentLengthStatistics(groupName).getPositiveMAD()) * 3) - readSize;
+        final int evidenceWidth = readMetadata.getFragmentLengthStatistics(groupName).getMaxNonOutlierFragmentSize() - readSize;
         // otherwise the test below will break as it is currently structured
         Assert.assertTrue(evidenceWidth % 2 == 0);
         final int uncertainty = evidenceWidth /2;

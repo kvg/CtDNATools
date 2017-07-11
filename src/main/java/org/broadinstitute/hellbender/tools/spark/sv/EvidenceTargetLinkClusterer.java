@@ -22,17 +22,15 @@ public class EvidenceTargetLinkClusterer {
         while (breakpointEvidenceIterator.hasNext()) {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
             if (nextEvidence.hasDistalTargets()) {
-                final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
-                System.err.println("21" + "\t" + (nextEvidence.getLocation().getStart() - 1) + "\t" + nextEvidence.getLocation().getEnd() +
-                        "\t" + "21" + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() + "\t"  +
-                        ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() + ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateEnd() + nextEvidence.hashCode() + "\t" + 1 + "\t" + (nextEvidence.isForwardStrand() ? "+" : "-") + "\t" + (nextEvidence.getDistalTargetStrands().get(0) ? "+" : "-"));
+                //final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
+                //System.err.println(toBedpeString(nextEvidence, nextEvidence.getLocation(), target));
                 EvidenceTargetLink updatedLink = null;
-                for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.iterator(); it.hasNext(); ) {
+                for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.overlappers(nextEvidence.getLocation()); it.hasNext(); ) {
                     final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();
                     final EvidenceTargetLink oldLink = sourceIntervalEntry.getValue();
                     // todo: what to do if there are more than one distal targets
-                    if (nextEvidence.hasDistalTargets() && nextEvidence.getLocation().overlaps(sourceIntervalEntry.getInterval())
-                            && strandsMatch(nextEvidence.isForwardStrand(), sourceIntervalEntry.getValue().sourceForwardStrand)
+                    if (nextEvidence.hasDistalTargets() &&
+                            strandsMatch(nextEvidence.isForwardStrand(), sourceIntervalEntry.getValue().sourceForwardStrand)
                         && (nextEvidence.getDistalTargets(readMetadata).get(0).overlaps(oldLink.target) &&
                                 strandsMatch(nextEvidence.getDistalTargetStrands().get(0), oldLink.targetForwardStrand))) {
                             // if it does, intersect the source and target intervals to refine the link
@@ -69,6 +67,14 @@ public class EvidenceTargetLinkClusterer {
             links.add(it.next().getValue());
         }
         return links.iterator();
+    }
+
+    public String toBedpeString(final BreakpointEvidence nextEvidence, final SVInterval source, final SVInterval target) {
+        return "21" + "\t" + (source.getStart() - 1) + "\t" + source.getEnd() +
+                "\t" + "21" + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() + "\t"  +
+                ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
+                ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateEnd() + nextEvidence.hashCode() + "\t" +
+                1 + "\t" + (nextEvidence.isForwardStrand() ? "+" : "-") + "\t" + (nextEvidence.getDistalTargetStrands().get(0) ? "+" : "-");
     }
 
     private static boolean strandsMatch(final Boolean forwardStrand1, final Boolean forwardStrand2) {

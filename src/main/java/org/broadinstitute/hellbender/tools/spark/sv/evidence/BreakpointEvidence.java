@@ -229,7 +229,7 @@ public class BreakpointEvidence {
         }
 
         private static SVInterval restOfFragmentInterval( final GATKRead read, final ReadMetadata metadata ) {
-            final int templateLen = metadata.getGroupMedianFragmentSize(read.getReadGroup()) + ((int) metadata.getFragmentLengthStatistics(read.getReadGroup()).getPositiveMAD()) * 3;
+            final int templateLen = metadata.getFragmentLengthStatistics(read.getReadGroup()).getMaxNonOutlierFragmentSize();
             int width;
             int start;
             if ( read.isReverseStrand() ) {
@@ -525,7 +525,7 @@ public class BreakpointEvidence {
             final int mateContigIndex = metadata.getContigID(read.getMateContig());
             final int mateStartPosition = read.getMateStart();
             final boolean mateReverseStrand = read.mateIsReverseStrand();
-            final int maxAllowableFragmentSize = metadata.getFragmentLengthStatistics(read.getReadGroup()).getMedian() + (int) metadata.getFragmentLengthStatistics(read.getReadGroup()).getPositiveMAD() * 3;
+            final int maxAllowableFragmentSize = metadata.getFragmentLengthStatistics(read.getReadGroup()).getMaxNonOutlierFragmentSize();
             final int mateAlignmentLength;
             // if the read has an MC attribute we don't have to assume the aligned read length of the mate
             if (read.hasAttribute("MC")) {
@@ -534,7 +534,7 @@ public class BreakpointEvidence {
                 mateAlignmentLength = read.getLength();
             }
             return new SVInterval(mateContigIndex,
-                    mateReverseStrand ? mateStartPosition - maxAllowableFragmentSize + mateAlignmentLength : mateStartPosition + mateAlignmentLength - MATE_ALIGNMENT_LENGTH_UNCERTAINTY,
+                    Math.max(0, mateReverseStrand ? mateStartPosition - maxAllowableFragmentSize + mateAlignmentLength : mateStartPosition + mateAlignmentLength - MATE_ALIGNMENT_LENGTH_UNCERTAINTY),
                     mateReverseStrand ? mateStartPosition + MATE_ALIGNMENT_LENGTH_UNCERTAINTY : mateStartPosition + maxAllowableFragmentSize);
         }
 
