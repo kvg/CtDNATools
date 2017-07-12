@@ -65,7 +65,7 @@ NUM_EXECUTORS=$((2 * ${NUM_WORKERS}))
     --breakpointIntervals "${PROJECT_OUTPUT_DIR}/intervals" \
     --fastqDir "${PROJECT_OUTPUT_DIR}/fastq" \
     --contigSAMFile "${PROJECT_OUTPUT_DIR}/assemblies.sam" \
-    ${SV_ARGS} \
+    --targetLinkFile ${PROJECT_OUTPUT_DIR}/target_links.bedpe \
     -- \
     --sparkRunner GCS \
     --cluster "${CLUSTER_NAME}" \
