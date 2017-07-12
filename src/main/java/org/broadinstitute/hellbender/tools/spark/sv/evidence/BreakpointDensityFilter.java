@@ -96,7 +96,7 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
             }
 
             for (final BreakpointEvidence evidence : evidenceForInterval) {
-                if (evidence.hasDistalTargets()) {
+                if (evidence.hasDistalTargets(readMetadata)) {
                     for (final SVInterval target : evidence.getDistalTargets(readMetadata)) {
                         addToTree(targetIntervalTree, target, evidence);
                     }

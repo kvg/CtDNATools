@@ -708,7 +708,10 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         // todo: add the partition-edge links if any
 
         final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
-        //evidenceTargetLinks.iterator().forEachRemaining(System.err::println);
+
+        // todo: sometimes this throws an IOException: connection reset by peer
+        evidenceRDD.unpersist();
+
         final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = deduplicateTargetLinks(evidenceTargetLinks);
 
         log("Collected " + targetLinkSourceTree.size() + " evidence target links", logger);
@@ -728,8 +731,6 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                 throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
             }
         }
-
-        evidenceRDD.unpersist();
 
         return intervals;
     }

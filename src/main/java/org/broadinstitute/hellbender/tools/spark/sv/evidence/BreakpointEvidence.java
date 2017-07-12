@@ -55,8 +55,9 @@ public class BreakpointEvidence {
 
     /**
      * Returns true if this piece of evidence specifies a possible distal target for the breakpoint.
+     * @param readMetadata
      */
-    public boolean hasDistalTargets() {
+    public boolean hasDistalTargets(final ReadMetadata readMetadata) {
         return false;
     }
 
@@ -72,8 +73,9 @@ public class BreakpointEvidence {
 
     /**
      * Returns the strands of the distal target intervals
+     * @param readMetadata
      */
-    public List<Boolean> getDistalTargetStrands() {
+    public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
         return null;
     }
 
@@ -333,8 +335,30 @@ public class BreakpointEvidence {
         }
 
         @Override
-        public boolean hasDistalTargets() {
-            return tagSA != null;
+        public boolean hasDistalTargets(final ReadMetadata readMetadata) {
+            return tagSA != null && hasHighQualityMappings(tagSA, readMetadata);
+        }
+
+        private boolean hasHighQualityMappings(final String tagSA, final ReadMetadata readMetadata) {
+            boolean hqMappingFound = false;
+            if (tagSA != null) {
+                final String[] saStrings = tagSA.split(";");
+                for (final String saString : saStrings) {
+                    final String[] saFields = saString.split(",", -1);
+                    final int mapQ = Integer.parseInt(saFields[4]);
+                    final int saContigId = readMetadata.getContigID(saFields[0]);
+                    if (isHighQualityMapping(readMetadata, mapQ, saContigId)) {
+                        hqMappingFound = true;
+                        break;
+                    }
+                }
+            }
+            return hqMappingFound;
+        }
+
+        private boolean isHighQualityMapping(final ReadMetadata readMetadata, final int mapQ, final int saContigId) {
+            return mapQ >= 20 && (saContigId == getLocation().getContig() ||
+                    (!readMetadata.ignoreCrossContigID(saContigId) && !readMetadata.ignoreCrossContigID(getLocation().getContig())));
         }
 
         @Override
@@ -343,7 +367,16 @@ public class BreakpointEvidence {
                 final String[] saStrings = tagSA.split(";");
                 final List<SVInterval> supplementaryAlignments = new ArrayList<>(saStrings.length);
                 for (final String saString : saStrings) {
-                    SVInterval saInterval = saStringToSVInterval(readMetadata, saString);
+                    final String[] saFields = saString.split(",", -1);
+                    if (saFields.length != 6) {
+                        throw new GATKException("Could not parse SATag: "+ saString);
+                    }
+                    final int mapQ = Integer.parseInt(saFields[4]);
+                    final int saContigId = readMetadata.getContigID(saFields[0]);
+                    if (! isHighQualityMapping(readMetadata, mapQ, saContigId)) {
+                        continue;
+                    }
+                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
                     supplementaryAlignments.add(saInterval);
                 }
                 return supplementaryAlignments;
@@ -354,16 +387,21 @@ public class BreakpointEvidence {
 
         // todo: inefficient to parse SA tags twice to get intervals and strands
         @Override
-        public List<Boolean> getDistalTargetStrands() {
+        public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
             if (tagSA != null) {
                 final String[] saStrings = tagSA.split(";");
                 final List<Boolean> supplementaryAlignmentStrands = new ArrayList<>(saStrings.length);
                 for (final String saString : saStrings) {
-                    final String[] values = saString.split(",", -1);
-                    if (values.length != 6) {
+                    final String[] saFields = saString.split(",", -1);
+                    if (saFields.length != 6) {
                         throw new GATKException("Could not parse SATag: "+ saString);
                     }
-                    final Cigar cigar = TextCigarCodec.decode(values[3]);
+                    final int mapQ = Integer.parseInt(saFields[4]);
+                    final int saContigId = readMetadata.getContigID(saFields[0]);
+                    if (! isHighQualityMapping(readMetadata, mapQ, saContigId)) {
+                        continue;
+                    }
+                    final Cigar cigar = TextCigarCodec.decode(saFields[3]);
                     // if the SA is right clipped, the evidence is on the forward strand ---->|
                     supplementaryAlignmentStrands.add( cigar.isRightClipped());
                 }
@@ -376,14 +414,10 @@ public class BreakpointEvidence {
         // todo: for now, taking the entire location of the supplementary alignment plus the uncertainty on each end
         // A better solution might be to find the location of the actual clip on the other end of the reference,
         // but that would be significantly more complex and possibly computationally ex pensive
-        private SVInterval saStringToSVInterval(final ReadMetadata readMetadata, final String saString) {
-            final String[] values = saString.split(",", -1);
-            if (values.length != 6) {
-                throw new GATKException("Could not parse SATag: "+ saString);
-            }
-            final String contigId = values[0];
-            final int pos = Integer.parseInt(values[1]);
-            final Cigar cigar = TextCigarCodec.decode(values[3]);
+        private SVInterval saStringToSVInterval(final ReadMetadata readMetadata, final String[] saFields) {
+            final String contigId = saFields[0];
+            final int pos = Integer.parseInt(saFields[1]);
+            final Cigar cigar = TextCigarCodec.decode(saFields[3]);
 
             return new SVInterval( readMetadata.getContigID(contigId),
                     pos - UNCERTAINTY,
@@ -474,6 +508,8 @@ public class BreakpointEvidence {
     public static abstract class DiscordantReadPairEvidence extends ReadEvidence {
         protected final SVInterval target;
         protected final boolean targetForwardStrand;
+        // todo: it would be more efficient and simple to just not have a distal target if the quality is so low
+        protected final int targetQuality;
 
         // even if we have access to and use the mate cigar, we still don't really know the exact breakpoint interval
         // specified by the mate since there could be unclipped mismatches at the ends of the alignment. This constant
@@ -484,12 +520,18 @@ public class BreakpointEvidence {
             super(read, metadata);
             target = getMateTargetInterval(read, metadata);
             targetForwardStrand = getMateForwardStrand(read);
+            if (read.hasAttribute("MQ")) {
+                targetQuality = read.getAttributeAsInteger("MQ");
+            } else {
+                targetQuality = Integer.MAX_VALUE;
+            }
         }
 
         public DiscordantReadPairEvidence(final Kryo kryo, final Input input) {
             super(kryo, input);
             target = intervalSerializer.read(kryo, input, SVInterval.class);
             targetForwardStrand = input.readBoolean();
+            targetQuality = input.readInt();
         }
 
         @Override
@@ -497,21 +539,30 @@ public class BreakpointEvidence {
             super.serialize(kryo, output);
             intervalSerializer.write(kryo, output, target);
             output.writeBoolean(targetForwardStrand);
+            output.writeInt(targetQuality);
         }
 
         @Override
-        public boolean hasDistalTargets() {
-            return true;
+        public boolean hasDistalTargets(final ReadMetadata readMetadata) {
+            return targetQuality >= 20 && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig());
         }
 
         @Override
         public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata) {
-            return Collections.singletonList(target);
+            if (targetQuality >= 20 && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig())) {
+                return Collections.singletonList(target);
+            } else {
+                return Collections.emptyList();
+            }
         }
 
         @Override
-        public List<Boolean> getDistalTargetStrands() {
-            return Collections.singletonList(targetForwardStrand);
+        public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
+            if (targetQuality >= 20 && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig())) {
+                return Collections.singletonList(targetForwardStrand);
+            } else {
+                return Collections.emptyList();
+            }
         }
 
         /**
