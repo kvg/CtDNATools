@@ -10,6 +10,8 @@ import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.*;
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchSet;
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchUniqueMultiMap;
+import org.broadinstitute.hellbender.utils.IntHistogramTest;
+import org.broadinstitute.hellbender.utils.read.ArtificialReadUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
@@ -41,7 +43,9 @@ public final class FindBreakpointEvidenceSparkUnitTest extends BaseTest {
     private final JavaRDD<GATKRead> reads = readsSource.getParallelReads(readsFile, null, null, 0L);
     private final SVReadFilter filter = new SVReadFilter(params);
     private final ReadMetadata readMetadataExpected =
-            new ReadMetadata(Collections.emptySet(), header, params.maxTrackedFragmentLength, reads, filter);
+            new ReadMetadata(Collections.emptySet(), header,
+                                new FragmentLengthStatistics(IntHistogramTest.genLogNormalSample(400, 40, 10000)),
+                new ReadMetadata.PartitionBounds[]{ new ReadMetadata.PartitionBounds(0, 1, 100, 10000)}, 100, 10, 30);
     private final Broadcast<ReadMetadata> broadcastMetadata = ctx.broadcast(readMetadataExpected);
     private final Set<String> expectedQNames = loadExpectedQNames(qNamesFile);
     private final Set<String> expectedAssemblyQNames = loadExpectedQNames(asmQNamesFile);

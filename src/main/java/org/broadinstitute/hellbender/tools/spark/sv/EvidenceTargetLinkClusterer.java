@@ -71,7 +71,7 @@ public class EvidenceTargetLinkClusterer {
         return "21" + "\t" + (source.getStart() - 1) + "\t" + source.getEnd() +
                 "\t" + "21" + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() + "\t"  +
                 ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-                ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateEnd() + nextEvidence.hashCode() + "\t" +
+                ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + nextEvidence.hashCode() + "\t" +
                 1 + "\t" + (nextEvidence.isForwardStrand() ? "+" : "-") + "\t" + (nextEvidence.getDistalTargetStrands(readMetadata).get(0) ? "+" : "-");
     }
 
