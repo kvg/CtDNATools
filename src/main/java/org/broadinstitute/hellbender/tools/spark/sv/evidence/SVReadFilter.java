@@ -38,7 +38,7 @@ public class SVReadFilter implements java.io.Serializable {
 
     public boolean isEvidence( final GATKRead read ) {
         return isMapped(read) && read.getMappingQuality() >= minEvidenceMapQ &&
-                SVUtils.matchLen(read.getCigar()) >= minEvidenceMatchLength;
+                SVUtils.matchLen(read.getCigar()) >= minEvidenceMatchLength && ! read.isSecondaryAlignment();
     }
 
     public boolean isTemplateLenTestable( final GATKRead read ) {

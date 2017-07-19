@@ -412,7 +412,11 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                                                             kmerMapSize).call(pairItr).iterator())
                 .collect();
 
-        broadcastKmerMultiMap.destroy();
+        try {
+            broadcastKmerMultiMap.destroy();
+        } catch (Exception e) {
+            logger.warn("Could not destroy broadcastKmerMultiMap", e);
+        }
 
         return qNames;
     }

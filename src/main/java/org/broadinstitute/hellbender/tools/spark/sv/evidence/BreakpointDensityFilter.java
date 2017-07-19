@@ -47,9 +47,11 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
         while ( !result && treeItr.hasNext() ) {
             final SVIntervalTree.Entry<List<BreakpointEvidence>> entry = treeItr.next();
             final SVInterval curInterval = entry.getInterval();
+            //System.err.println("checking " + curInterval);
             if ( isValidated(entry.getValue()) || hasEnoughOverlappers(curInterval) ) {
+                //System.err.println("Vadlidating " + curInterval);
                 entry.getValue().forEach(ev -> ev.setValidated(true));
-                evidenceTree.overlappers(curInterval).forEachRemaining(e -> e.getValue().forEach(be -> be.setValidated(true)));
+                //evidenceTree.overlappers(curInterval).forEachRemaining(e -> e.getValue().forEach(be -> System.err.println(be.toString())));
                 result = true;
             } else if ( partitionCrossingChecker.onBoundary(curInterval) ) {
                 result = true;
@@ -93,6 +95,7 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
             final List<BreakpointEvidence> evidenceForInterval = itr.next().getValue();
             weight += evidenceForInterval.stream().mapToInt(BreakpointEvidence::getWeight).sum();
             if ( weight >= minEvidenceWeight ) {
+                //System.err.println("validating for weight: "+ weight);
                 return true;
             }
 
@@ -114,6 +117,7 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
             PairedStrandedIntervalTree.PairedStrandedIntervals next = targetLinkIterator.next();
             final int coherentEvidenceWeight = (int) Utils.stream(targetIntervalTree.overlappers(next)).count();
             if (coherentEvidenceWeight >= minCoherentEvidenceWeight) {
+                //System.err.println("validating for coherent weight: "+ coherentEvidenceWeight);
                 return true;
             }
 

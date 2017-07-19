@@ -55,11 +55,12 @@ public class BreakpointDensityFilterTest extends BaseTest {
         final List<GATKRead> pair1 = ArtificialReadUtils.createPair(artificialSamHeader, "pair1", 151, 1250, 500000, true, false);
         evidenceList.add(new BreakpointEvidence.WeirdTemplateSize(pair1.get(0), readMetadata));
 
-        final List<GATKRead> pair2 = ArtificialReadUtils.createPair(artificialSamHeader, "pair1", 151, 1255, 500000, true, false);
+        final List<GATKRead> pair2 = ArtificialReadUtils.createPair(artificialSamHeader, "pair2", 151, 1255, 500000, true, false);
         evidenceList.add(new BreakpointEvidence.WeirdTemplateSize(pair2.get(0), readMetadata));
 
-        final List<GATKRead> pair3 = ArtificialReadUtils.createPair(artificialSamHeader, "pair1", 151, 1350, 500000, true, false);
+        final List<GATKRead> pair3 = ArtificialReadUtils.createPair(artificialSamHeader, "pair3", 151, 1350, 500000, true, false);
         evidenceList.add(new BreakpointEvidence.WeirdTemplateSize(pair3.get(0), readMetadata));
+
 
         return new Object[][] {{evidenceList}};
     }
