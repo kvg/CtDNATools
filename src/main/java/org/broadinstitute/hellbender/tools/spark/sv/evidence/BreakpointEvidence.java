@@ -346,8 +346,8 @@ public class BreakpointEvidence {
                 for (final String saString : saStrings) {
                     final String[] saFields = saString.split(",", -1);
                     final int mapQ = Integer.parseInt(saFields[4]);
-                    final int saContigId = readMetadata.getContigID(saFields[0]);
-                    if (isHighQualityMapping(readMetadata, mapQ, saContigId)) {
+                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
+                    if (isHighQualityMapping(readMetadata, mapQ, saInterval)) {
                         hqMappingFound = true;
                         break;
                     }
@@ -356,9 +356,11 @@ public class BreakpointEvidence {
             return hqMappingFound;
         }
 
-        private boolean isHighQualityMapping(final ReadMetadata readMetadata, final int mapQ, final int saContigId) {
-            return mapQ >= 20 && (saContigId == getLocation().getContig() ||
-                    (!readMetadata.ignoreCrossContigID(saContigId) && !readMetadata.ignoreCrossContigID(getLocation().getContig())));
+        private boolean isHighQualityMapping(final ReadMetadata readMetadata, final int mapQ, final SVInterval saInterval) {
+            return mapQ >= 20 &&
+                    (saInterval.getContig() == getLocation().getContig() ||
+                    (!readMetadata.ignoreCrossContigID(saInterval.getContig()) && !readMetadata.ignoreCrossContigID(getLocation().getContig())))
+                    && ! saInterval.overlaps(getLocation());
         }
 
         @Override
@@ -372,11 +374,10 @@ public class BreakpointEvidence {
                         throw new GATKException("Could not parse SATag: "+ saString);
                     }
                     final int mapQ = Integer.parseInt(saFields[4]);
-                    final int saContigId = readMetadata.getContigID(saFields[0]);
-                    if (! isHighQualityMapping(readMetadata, mapQ, saContigId)) {
+                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
+                    if (! isHighQualityMapping(readMetadata, mapQ, saInterval)) {
                         continue;
                     }
-                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
                     supplementaryAlignments.add(saInterval);
                 }
                 return supplementaryAlignments;
@@ -397,8 +398,8 @@ public class BreakpointEvidence {
                         throw new GATKException("Could not parse SATag: "+ saString);
                     }
                     final int mapQ = Integer.parseInt(saFields[4]);
-                    final int saContigId = readMetadata.getContigID(saFields[0]);
-                    if (! isHighQualityMapping(readMetadata, mapQ, saContigId)) {
+                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
+                    if (! isHighQualityMapping(readMetadata, mapQ, saInterval)) {
                         continue;
                     }
                     final Cigar cigar = TextCigarCodec.decode(saFields[3]);
