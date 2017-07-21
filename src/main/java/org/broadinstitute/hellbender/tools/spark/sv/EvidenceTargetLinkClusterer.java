@@ -7,15 +7,13 @@ import java.util.List;
 public class EvidenceTargetLinkClusterer {
 
     private final ReadMetadata readMetadata;
-    private final int totalNumIntervals;
 
-    public EvidenceTargetLinkClusterer(final ReadMetadata readMetadata, final int totalNumIntervals) {
+    public EvidenceTargetLinkClusterer(final ReadMetadata readMetadata) {
         this.readMetadata = readMetadata;
-        this.totalNumIntervals = totalNumIntervals;
     }
 
     public Iterator<EvidenceTargetLink> cluster(final Iterator<BreakpointEvidence> breakpointEvidenceIterator) throws Exception {
-        final List<EvidenceTargetLink> links = new ArrayList<>(totalNumIntervals / readMetadata.getNPartitions());
+        final List<EvidenceTargetLink> links = new ArrayList<>();
         final SVIntervalTree<EvidenceTargetLink> currentIntervalsWithTargets = new SVIntervalTree<>();
         while (breakpointEvidenceIterator.hasNext()) {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();

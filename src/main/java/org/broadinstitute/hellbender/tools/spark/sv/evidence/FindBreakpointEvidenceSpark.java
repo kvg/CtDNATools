@@ -615,14 +615,50 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         // 2) that look like they support a hypothesis of a breakpoint in the vicinity
         // 3a) filter out those that lack supporting evidence from a sufficient number of other reads, except
         // 3b) pass through everything within a fragment length of partition boundaries
-        final JavaRDD<BreakpointEvidence> evidenceRDD =
-                unfilteredReads
-                    .mapPartitions(readItr -> {
-                        final GATKRead sentinel = new SAMRecordToGATKReadAdapter(null);
-                        return FlatMapGluer.applyMapFunc(
-                                new ReadClassifier(broadcastMetadata.value(),sentinel,allowedOverhang,filter),
-                                readItr,sentinel);
-                        }, true)
+        final JavaRDD<BreakpointEvidence> evidenceRDD = unfilteredReads
+                .mapPartitions(readItr -> {
+                    final GATKRead sentinel = new SAMRecordToGATKReadAdapter(null);
+                    return FlatMapGluer.applyMapFunc(
+                            new ReadClassifier(broadcastMetadata.value(), sentinel, allowedOverhang, filter),
+                            readItr, sentinel);
+                }, true);
+        evidenceRDD.cache();
+
+        final JavaRDD<EvidenceTargetLink> evidenceTargetLinkJavaRDD = evidenceRDD.mapPartitions(
+                itr -> {
+                    final ReadMetadata readMetadata = broadcastMetadata.getValue();
+                    final EvidenceTargetLinkClusterer clusterer = new EvidenceTargetLinkClusterer(readMetadata);
+                    return clusterer.cluster(itr);
+                })
+                .filter(link -> link.undirectedWeight > 2 || link.directedWeight > 0);
+
+        // todo: add the partition-edge links if any
+
+        final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
+
+        final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = deduplicateTargetLinks(evidenceTargetLinks);
+
+        log("Collected " + targetLinkSourceTree.size() + " evidence target links", logger);
+
+        if ( params.targetLinkFile != null ) {
+            try (final OutputStreamWriter writer =
+                         new OutputStreamWriter(new BufferedOutputStream(BucketUtils.createFile(params.targetLinkFile)))) {
+                targetLinkSourceTree.iterator().forEachRemaining(entry -> {
+                    final String bedpeRecord = entry.getValue().toBedpeString(broadcastMetadata.getValue());
+                    try {
+                        System.err.println(bedpeRecord);
+                        writer.write(bedpeRecord + "\n");
+                    } catch (final IOException ioe) {
+                        throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
+                    }
+                });
+            } catch ( final IOException ioe ) {
+                throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
+            }
+        }
+
+        final JavaRDD<BreakpointEvidence> filteredEvidenceRDD =
+                evidenceRDD
                     .mapPartitionsWithIndex( (idx, evidenceItr) -> {
                             final ReadMetadata readMetadata = broadcastMetadata.value();
                             final PartitionCrossingChecker xChecker =
@@ -632,11 +668,11 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                                                                minEvidenceWeight,minCoherentEvidenceWeight,xChecker);
                         }, true);
 
-        evidenceRDD.cache();
+        filteredEvidenceRDD.cache();
 
         // record the evidence
         if ( params.evidenceDir != null ) {
-            evidenceRDD
+            filteredEvidenceRDD
                     .filter(BreakpointEvidence::isValidated)
                     .saveAsTextFile(params.evidenceDir);
         }
@@ -646,7 +682,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         // collect the whole mess in the driver.
         final int maxFragmentSize = broadcastMetadata.value().getMaxMedianFragmentSize();
         final List<BreakpointEvidence> collectedEvidence =
-                evidenceRDD
+                filteredEvidenceRDD
                         .mapPartitionsWithIndex( (idx, readEvidenceItr) ->
                                 new FlatMapGluer<>(
                                         new BreakpointEvidenceClusterer(maxFragmentSize,
@@ -655,6 +691,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                                         new BreakpointEvidence(new SVInterval(nContigs,1,1),0,false)), true)
                         .collect();
 
+        filteredEvidenceRDD.unpersist();
         evidenceRDD.unpersist();
 
         // reapply the density filter (all data collected -- no more worry about partition boundaries).
@@ -698,42 +735,6 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         final List<SVInterval> intervals = new ArrayList<>(allEvidence.size());
         while ( evidenceIterator2.hasNext() ) {
             intervals.add(evidenceIterator2.next().getLocation());
-        }
-
-        final int totalNumIntervals = intervals.size();
-        final JavaRDD<EvidenceTargetLink> evidenceTargetLinkJavaRDD = evidenceRDD.mapPartitions(
-                itr -> {
-                    final ReadMetadata readMetadata = broadcastMetadata.getValue();
-                    final EvidenceTargetLinkClusterer clusterer = new EvidenceTargetLinkClusterer(readMetadata, totalNumIntervals);
-                    return clusterer.cluster(itr);
-                })
-                .filter(link -> link.undirectedWeight > 2 || link.directedWeight > 0);
-
-        // todo: add the partition-edge links if any
-
-        final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
-
-        // todo: sometimes this throws an IOException: connection reset by peer
-        evidenceRDD.unpersist();
-
-        final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = deduplicateTargetLinks(evidenceTargetLinks);
-
-        log("Collected " + targetLinkSourceTree.size() + " evidence target links", logger);
-
-        if ( params.targetLinkFile != null ) {
-            try (final OutputStreamWriter writer =
-                         new OutputStreamWriter(new BufferedOutputStream(BucketUtils.createFile(params.targetLinkFile)))) {
-                targetLinkSourceTree.iterator().forEachRemaining(entry -> {
-                    final String bedpeRecord = entry.getValue().toBedpeString(broadcastMetadata.getValue());
-                    try {
-                        writer.write(bedpeRecord + "\n");
-                    } catch (final IOException ioe) {
-                        throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
-                    }
-                });
-            } catch ( final IOException ioe ) {
-                throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
-            }
         }
 
         return intervals;
