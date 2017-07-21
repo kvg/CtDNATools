@@ -44,7 +44,8 @@ public class FindBreakpointEvidenceSparkIntegrationTest extends CommandLineProgr
                     " --alignerIndexImage " + alignerRefIndexImgLoc +
                     " --kmersToIgnore " + kmerIgnoreListLoc +
                     " --breakpointIntervals " + outputDir + "/intervals" +
-                    " --fastqDir "            + outputDir + "/fastq";
+                    " --fastqDir "            + outputDir + "/fastq" +
+                    " --targetLinkFile "      + outputDir + "/targetLinks.bedpe";
         }
     }
 

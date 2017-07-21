@@ -52,6 +52,7 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
                 //System.err.println("Vadlidating " + curInterval);
                 entry.getValue().forEach(ev -> ev.setValidated(true));
                 //evidenceTree.overlappers(curInterval).forEachRemaining(e -> e.getValue().forEach(be -> System.err.println(be.toString())));
+                //evidenceTree.overlappers(curInterval).forEachRemaining(e -> e.getValue().forEach(be -> be.setValidated(true)));
                 result = true;
             } else if ( partitionCrossingChecker.onBoundary(curInterval) ) {
                 result = true;

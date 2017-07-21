@@ -302,6 +302,7 @@ public class BreakpointEvidence {
         private static final String SA_TAG_NAME = "SA";
         private final String cigar;
         private final String tagSA;
+        private final List<SAMapping> saMappings;
 
         public SplitRead( final GATKRead read, final ReadMetadata metadata, final boolean atStart ) {
             // todo: if reads have multiple SA tags.. we should have two peices of evidence with the right strands
@@ -313,13 +314,14 @@ public class BreakpointEvidence {
             } else {
                 tagSA = null;
             }
+            saMappings = parseSATag(tagSA);
         }
 
         private SplitRead( final Kryo kryo, final Input input ) {
             super(kryo, input);
             cigar = input.readString();
             tagSA = input.readString();
-
+            saMappings = parseSATag(tagSA);
         }
 
         @Override
@@ -334,19 +336,44 @@ public class BreakpointEvidence {
             return super.toString()+"\tSplit\t"+cigar+"\t"+(tagSA == null ? " SA: None" : (" SA: " + tagSA));
         }
 
-        @Override
-        public boolean hasDistalTargets(final ReadMetadata readMetadata) {
-            return tagSA != null && hasHighQualityMappings(tagSA, readMetadata);
-        }
-
-        private boolean hasHighQualityMappings(final String tagSA, final ReadMetadata readMetadata) {
-            boolean hqMappingFound = false;
-            if (tagSA != null) {
+        private List<SAMapping> parseSATag(final String tagSA) {
+            if (tagSA == null) {
+                return null;
+            } else {
                 final String[] saStrings = tagSA.split(";");
+                final List<SAMapping> supplementaryAlignments = new ArrayList<>(saStrings.length);
                 for (final String saString : saStrings) {
                     final String[] saFields = saString.split(",", -1);
+                    if (saFields.length != 6) {
+                        throw new GATKException("Could not parse SATag: "+ saString);
+                    }
+                    final String contigId = saFields[0];
+                    final int pos = Integer.parseInt(saFields[1]);
+                    final boolean strand = "+".equals(saFields[2]);
+                    final String cigarString = saFields[3];
                     final int mapQ = Integer.parseInt(saFields[4]);
-                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
+                    final int mismatches = Integer.parseInt(saFields[5]);
+                    SAMapping saMapping = new SAMapping(contigId, pos, strand, cigarString, mapQ, mismatches);
+
+                    supplementaryAlignments.add(saMapping);
+                }
+                return supplementaryAlignments;
+
+            }
+
+        }
+
+        @Override
+        public boolean hasDistalTargets(final ReadMetadata readMetadata) {
+            return tagSA != null && hasHighQualityMappings(readMetadata);
+        }
+
+        private boolean hasHighQualityMappings(final ReadMetadata readMetadata) {
+            boolean hqMappingFound = false;
+            if (saMappings != null) {
+                for (final SAMapping mapping : saMappings) {
+                    final int mapQ = mapping.getMapq();
+                    SVInterval saInterval = saMappingToSVInterval(readMetadata, mapping);
                     if (isHighQualityMapping(readMetadata, mapQ, saInterval)) {
                         hqMappingFound = true;
                         break;
@@ -365,16 +392,11 @@ public class BreakpointEvidence {
 
         @Override
         public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata) {
-            if (tagSA != null) {
-                final String[] saStrings = tagSA.split(";");
-                final List<SVInterval> supplementaryAlignments = new ArrayList<>(saStrings.length);
-                for (final String saString : saStrings) {
-                    final String[] saFields = saString.split(",", -1);
-                    if (saFields.length != 6) {
-                        throw new GATKException("Could not parse SATag: "+ saString);
-                    }
-                    final int mapQ = Integer.parseInt(saFields[4]);
-                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
+            if (saMappings != null) {
+                List<SVInterval> supplementaryAlignments = new ArrayList<>(saMappings.size());
+                for (final SAMapping saMapping : saMappings) {
+                    final int mapQ = saMapping.getMapq();
+                    SVInterval saInterval = saMappingToSVInterval(readMetadata, saMapping);
                     if (! isHighQualityMapping(readMetadata, mapQ, saInterval)) {
                         continue;
                     }
@@ -386,23 +408,17 @@ public class BreakpointEvidence {
             }
         }
 
-        // todo: inefficient to parse SA tags twice to get intervals and strands
         @Override
         public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
-            if (tagSA != null) {
-                final String[] saStrings = tagSA.split(";");
-                final List<Boolean> supplementaryAlignmentStrands = new ArrayList<>(saStrings.length);
-                for (final String saString : saStrings) {
-                    final String[] saFields = saString.split(",", -1);
-                    if (saFields.length != 6) {
-                        throw new GATKException("Could not parse SATag: "+ saString);
-                    }
-                    final int mapQ = Integer.parseInt(saFields[4]);
-                    SVInterval saInterval = saStringToSVInterval(readMetadata, saFields);
+            if (saMappings != null) {
+                final List<Boolean> supplementaryAlignmentStrands = new ArrayList<>(saMappings.size());
+                for (final SAMapping saMapping : saMappings) {
+                    final int mapQ = saMapping.getMapq();
+                    SVInterval saInterval = saMappingToSVInterval(readMetadata, saMapping);
                     if (! isHighQualityMapping(readMetadata, mapQ, saInterval)) {
                         continue;
                     }
-                    final Cigar cigar = TextCigarCodec.decode(saFields[3]);
+                    final Cigar cigar = TextCigarCodec.decode(saMapping.getCigar());
                     // if the SA is right clipped, the evidence is on the forward strand ---->|
                     supplementaryAlignmentStrands.add( cigar.isRightClipped());
                 }
@@ -414,13 +430,13 @@ public class BreakpointEvidence {
 
         // todo: for now, taking the entire location of the supplementary alignment plus the uncertainty on each end
         // A better solution might be to find the location of the actual clip on the other end of the reference,
-        // but that would be significantly more complex and possibly computationally ex pensive
-        private SVInterval saStringToSVInterval(final ReadMetadata readMetadata, final String[] saFields) {
-            final String contigId = saFields[0];
-            final int pos = Integer.parseInt(saFields[1]);
-            final Cigar cigar = TextCigarCodec.decode(saFields[3]);
+        // but that would be significantly more complex and possibly computationally expensive
+        private SVInterval saMappingToSVInterval(final ReadMetadata readMetadata, final SAMapping saMapping) {
+            final int contigId = readMetadata.getContigID(saMapping.getContigName());
+            final int pos = saMapping.getStart();
+            final Cigar cigar = TextCigarCodec.decode(saMapping.getCigar());
 
-            return new SVInterval( readMetadata.getContigID(contigId),
+            return new SVInterval( contigId,
                     pos - UNCERTAINTY,
                     pos + cigar.getPaddedReferenceLength() + UNCERTAINTY + 1);
 
@@ -435,6 +451,48 @@ public class BreakpointEvidence {
             @Override
             public SplitRead read( final Kryo kryo, final Input input, final Class<SplitRead> klass ) {
                 return new SplitRead(kryo, input);
+            }
+        }
+
+        final static class SAMapping {
+            private final String contigName;
+            private final int start;
+            private final boolean strand;
+            private final String cigar;
+            private final int mapq;
+            private final int mismatches;
+
+            public SAMapping(final String contigName, final int start, final boolean strand, final String cigar, final int mapq, final int mismatches) {
+                this.contigName = contigName;
+                this.start = start;
+                this.strand = strand;
+                this.cigar = cigar;
+                this.mapq = mapq;
+                this.mismatches = mismatches;
+            }
+
+            public String getContigName() {
+                return contigName;
+            }
+
+            public int getStart() {
+                return start;
+            }
+
+            public boolean isStrand() {
+                return strand;
+            }
+
+            public String getCigar() {
+                return cigar;
+            }
+
+            public int getMapq() {
+                return mapq;
+            }
+
+            public int getMismatches() {
+                return mismatches;
             }
         }
     }
