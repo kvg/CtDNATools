@@ -636,6 +636,9 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
 
         final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
 
+        evidenceTargetLinks.stream().forEach(e -> System.err.println(e.toBedpeString(broadcastMetadata.getValue())));
+        System.err.println("deduplicating...");
+
         final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = deduplicateTargetLinks(evidenceTargetLinks);
 
         log("Collected " + targetLinkSourceTree.size() + " evidence target links", logger);

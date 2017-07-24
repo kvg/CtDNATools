@@ -419,8 +419,15 @@ public class BreakpointEvidence {
                         continue;
                     }
                     final Cigar cigar = TextCigarCodec.decode(saMapping.getCigar());
-                    // if the SA is right clipped, the evidence is on the forward strand ---->|
-                    supplementaryAlignmentStrands.add( cigar.isRightClipped());
+                    if (isForwardStrand() && saMapping.isForwardStrand()) {
+                        supplementaryAlignmentStrands.add(!cigar.isLeftClipped());
+                    } else if (! isForwardStrand() && ! saMapping.isForwardStrand()) {
+                        supplementaryAlignmentStrands.add(cigar.isRightClipped());
+                    } else if (isForwardStrand() && ! saMapping.isForwardStrand()) {
+                        supplementaryAlignmentStrands.add(!cigar.isRightClipped());
+                    } else if (! isForwardStrand() && saMapping.isForwardStrand()) {
+                        supplementaryAlignmentStrands.add(cigar.isLeftClipped());
+                    }
                 }
                 return supplementaryAlignmentStrands;
             } else {
@@ -457,7 +464,7 @@ public class BreakpointEvidence {
         final static class SAMapping {
             private final String contigName;
             private final int start;
-            private final boolean strand;
+            private final boolean forwardStrand;
             private final String cigar;
             private final int mapq;
             private final int mismatches;
@@ -465,7 +472,7 @@ public class BreakpointEvidence {
             public SAMapping(final String contigName, final int start, final boolean strand, final String cigar, final int mapq, final int mismatches) {
                 this.contigName = contigName;
                 this.start = start;
-                this.strand = strand;
+                this.forwardStrand = strand;
                 this.cigar = cigar;
                 this.mapq = mapq;
                 this.mismatches = mismatches;
@@ -479,8 +486,8 @@ public class BreakpointEvidence {
                 return start;
             }
 
-            public boolean isStrand() {
-                return strand;
+            public boolean isForwardStrand() {
+                return forwardStrand;
             }
 
             public String getCigar() {

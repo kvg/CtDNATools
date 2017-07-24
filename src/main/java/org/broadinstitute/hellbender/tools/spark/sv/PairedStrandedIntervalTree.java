@@ -1,6 +1,5 @@
 package org.broadinstitute.hellbender.tools.spark.sv;
 
-import javafx.util.Pair;
 import scala.Tuple2;
 
 import java.util.ArrayList;

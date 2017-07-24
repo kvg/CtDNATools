@@ -60,7 +60,7 @@ class EvidenceTargetLink {
     private String getId(final Map<Integer, String> contigIdToContigNameMap) {
         return contigIdToContigNameMap.get(source.getContig()) + "_" + (source.getStart() - 1) + "_" + source.getEnd() +
                 "_" + contigIdToContigNameMap.get(target.getContig()) + "_" + (target.getStart() - 1) + "_" + target.getEnd() +
-                "_" + (sourceForwardStrand ? "P" : "M")  + (targetForwardStrand ? "P" : "M");
+                "_" + (sourceForwardStrand ? "P" : "M")  + (targetForwardStrand ? "P" : "M") + "_" + directedWeight + "_" + undirectedWeight;
     }
 
     public static final class Serializer extends com.esotericsoftware.kryo.Serializer<EvidenceTargetLink> {
