@@ -1,8 +1,5 @@
 package org.broadinstitute.hellbender.tools.spark.sv.evidence;
 
-import htsjdk.samtools.CigarOperator;
-import htsjdk.samtools.util.StringUtil;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -25,7 +22,7 @@ public class TextMDCodec {
     static final Pattern mdPat = Pattern.compile("\\G(?:([0-9]+)|([ACTGNactgn])|(\\^[ACTGNactgn]+))");
 
     static List<MDElement> parseMDString(final String mdString) {
-        List<MDElement> results = new ArrayList<>();
+        final List<MDElement> results = new ArrayList<>();
         final Matcher match = mdPat.matcher(mdString);
         while (match.find()) {
             String mg;
@@ -44,15 +41,35 @@ public class TextMDCodec {
     }
 
     abstract static class MDElement {
+        final int length;
+
+        public MDElement(final int length) {
+            this.length = length;
+        }
+
         public abstract int getLength();
+
+        @Override
+        public boolean equals(final Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            final MDElement mdElement = (MDElement) o;
+
+            return length == mdElement.length;
+        }
+
+        @Override
+        public int hashCode() {
+            return length;
+        }
     }
 
     static class MatchMDElement extends MDElement {
 
-        final int length;
 
         public MatchMDElement(final int length) {
-            this.length = length;
+            super(length);
         }
 
         @Override
@@ -63,6 +80,10 @@ public class TextMDCodec {
 
     static class MismatchMDElement extends MDElement {
 
+        public MismatchMDElement() {
+            super(1);
+        }
+
         @Override
         public int getLength() {
             return 1;
@@ -71,10 +92,8 @@ public class TextMDCodec {
 
     static class DeletionMDElement extends MDElement {
 
-        final int length;
-
         public DeletionMDElement(final int length) {
-            this.length = length;
+            super(length);
         }
 
         @Override
