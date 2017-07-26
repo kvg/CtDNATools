@@ -16,16 +16,16 @@ class EvidenceTargetLink {
     final boolean sourceForwardStrand;
     final SVInterval target;
     final boolean targetForwardStrand;
-    final int directedWeight;
-    final int undirectedWeight;
+    final int splitReads;
+    final int readPairs;
 
-    public EvidenceTargetLink(final SVInterval source, final boolean sourceForwardStrand, final SVInterval target, final boolean targetForwardStrand, final int directedWeight, final int undirectedWeight) {
+    public EvidenceTargetLink(final SVInterval source, final boolean sourceForwardStrand, final SVInterval target, final boolean targetForwardStrand, final int splitReads, final int readPairs) {
         this.source = source;
         this.sourceForwardStrand = sourceForwardStrand;
         this.target = target;
         this.targetForwardStrand = targetForwardStrand;
-        this.directedWeight = directedWeight;
-        this.undirectedWeight = undirectedWeight;
+        this.splitReads = splitReads;
+        this.readPairs = readPairs;
     }
 
     public EvidenceTargetLink(final Kryo kryo, final Input input) {
@@ -34,8 +34,8 @@ class EvidenceTargetLink {
         this.target = intervalSerializer.read(kryo, input, SVInterval.class);
         this.targetForwardStrand = input.readBoolean();
 
-        this.directedWeight = input.readInt();
-        this.undirectedWeight = input.readInt();
+        this.splitReads = input.readInt();
+        this.readPairs = input.readInt();
     }
 
     protected void serialize(final Kryo kryo, final Output output ) {
@@ -44,8 +44,8 @@ class EvidenceTargetLink {
         intervalSerializer.write(kryo, output, target);
         output.writeBoolean(targetForwardStrand);
 
-        output.writeInt(directedWeight);
-        output.writeInt(undirectedWeight);
+        output.writeInt(splitReads);
+        output.writeInt(readPairs);
     }
 
     public String toBedpeString(ReadMetadata readMetadata) {
@@ -54,13 +54,13 @@ class EvidenceTargetLink {
         return contigIdToContigNameMap.get(source.getContig()) + "\t" + (source.getStart() - 1) + "\t" + source.getEnd() +
                 "\t" + contigIdToContigNameMap.get(target.getContig()) + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() +
                 "\t"  + getId(contigIdToContigNameMap) + "\t" +
-                (undirectedWeight + directedWeight) + "\t" + (sourceForwardStrand ? "+" : "-") + "\t" + (targetForwardStrand ? "+" : "-");
+                (readPairs + splitReads) + "\t" + (sourceForwardStrand ? "+" : "-") + "\t" + (targetForwardStrand ? "+" : "-");
     }
 
     private String getId(final Map<Integer, String> contigIdToContigNameMap) {
         return contigIdToContigNameMap.get(source.getContig()) + "_" + (source.getStart() - 1) + "_" + source.getEnd() +
                 "_" + contigIdToContigNameMap.get(target.getContig()) + "_" + (target.getStart() - 1) + "_" + target.getEnd() +
-                "_" + (sourceForwardStrand ? "P" : "M")  + (targetForwardStrand ? "P" : "M") + "_" + directedWeight + "_" + undirectedWeight;
+                "_" + (sourceForwardStrand ? "P" : "M")  + (targetForwardStrand ? "P" : "M") + "_" + splitReads + "_" + readPairs;
     }
 
     public static final class Serializer extends com.esotericsoftware.kryo.Serializer<EvidenceTargetLink> {
@@ -84,8 +84,8 @@ class EvidenceTargetLink {
 
         if (sourceForwardStrand != link.sourceForwardStrand) return false;
         if (targetForwardStrand != link.targetForwardStrand) return false;
-        if (directedWeight != link.directedWeight) return false;
-        if (undirectedWeight != link.undirectedWeight) return false;
+        if (splitReads != link.splitReads) return false;
+        if (readPairs != link.readPairs) return false;
         if (source != null ? !source.equals(link.source) : link.source != null) return false;
         return target != null ? target.equals(link.target) : link.target == null;
     }
@@ -96,8 +96,8 @@ class EvidenceTargetLink {
         result = 31 * result + (sourceForwardStrand ? 1 : 0);
         result = 31 * result + (target != null ? target.hashCode() : 0);
         result = 31 * result + (targetForwardStrand ? 1 : 0);
-        result = 31 * result + directedWeight;
-        result = 31 * result + undirectedWeight;
+        result = 31 * result + splitReads;
+        result = 31 * result + readPairs;
         return result;
     }
 
@@ -108,8 +108,8 @@ class EvidenceTargetLink {
                 ", sourceForwardStrand=" + sourceForwardStrand +
                 ", target=" + target +
                 ", targetForwardStrand=" + targetForwardStrand +
-                ", directedWeight=" + directedWeight +
-                ", undirectedWeight=" + undirectedWeight +
+                ", splitReads=" + splitReads +
+                ", readPairs=" + readPairs +
                 '}';
     }
 }

@@ -316,7 +316,11 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                 .map(localAssemblyHandler::apply)
                 .collect();
 
-        broadcastQNamesMultiMap.destroy();
+        try {
+            broadcastQNamesMultiMap.destroy();
+        } catch (Exception e) {
+            logger.warn("Could not destroy broadcastQNamesMultiMap", e);
+        }
         BwaMemIndexCache.closeAllDistributedInstances(ctx);
 
         return intervalDispositions;
@@ -630,14 +634,15 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                     final EvidenceTargetLinkClusterer clusterer = new EvidenceTargetLinkClusterer(readMetadata);
                     return clusterer.cluster(itr);
                 })
-                .filter(link -> link.undirectedWeight > 2 || link.directedWeight > 0);
+                .filter(link -> link.readPairs > 2 || link.splitReads > 0);
 
         // todo: add the partition-edge links if any
 
         final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
 
-        evidenceTargetLinks.stream().forEach(e -> System.err.println(e.toBedpeString(broadcastMetadata.getValue())));
-        System.err.println("deduplicating...");
+        //System.err.println("got links...");
+        //evidenceTargetLinks.stream().forEach(e -> System.err.println(e.toBedpeString(broadcastMetadata.getValue())));
+        //System.err.println("deduplicating...");
 
         final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = deduplicateTargetLinks(evidenceTargetLinks);
 
@@ -649,7 +654,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                 targetLinkSourceTree.iterator().forEachRemaining(entry -> {
                     final String bedpeRecord = entry.getValue().toBedpeString(broadcastMetadata.getValue());
                     try {
-                        System.err.println(bedpeRecord);
+                        //System.err.println(bedpeRecord);
                         writer.write(bedpeRecord + "\n");
                     } catch (final IOException ioe) {
                         throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
@@ -758,7 +763,8 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                 if (existingLink.source.overlaps(link.target) && existingLink.sourceForwardStrand == link.targetForwardStrand &&
                         existingLink.target.overlaps(link.source) && existingLink.targetForwardStrand == link.sourceForwardStrand) {
                     newLink = new EvidenceTargetLink(link.target.intersect(existingLink.source), link.targetForwardStrand,
-                            link.source.intersect(existingLink.target), link.sourceForwardStrand, link.directedWeight + existingLink.directedWeight,  link.undirectedWeight);
+                            link.source.intersect(existingLink.target), link.sourceForwardStrand,
+                            Math.max(link.splitReads, existingLink.splitReads), Math.max(link.readPairs, existingLink.readPairs));
                     overlappers.remove();
                     break;
                 }
@@ -766,7 +772,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
             if (newLink != null) {
                 targetLinkSourceTree.put(newLink.source, newLink);
             } else {
-                targetLinkSourceTree.put(link.target, new EvidenceTargetLink(link.target, link.targetForwardStrand, link.source, link.sourceForwardStrand, link.directedWeight, link.undirectedWeight));
+                targetLinkSourceTree.put(link.target, new EvidenceTargetLink(link.target, link.targetForwardStrand, link.source, link.sourceForwardStrand, link.splitReads, link.readPairs));
             }
 
         });

@@ -298,15 +298,15 @@ public class BreakpointEvidence {
 
     @DefaultSerializer(SplitRead.Serializer.class)
     public static final class SplitRead extends ReadEvidence {
-        private static final int UNCERTAINTY = 2;
+        private static final int UNCERTAINTY = 3;
         private static final String SA_TAG_NAME = "SA";
         private final String cigar;
         private final String tagSA;
         private final List<SAMapping> saMappings;
 
         public SplitRead( final GATKRead read, final ReadMetadata metadata, final boolean atStart ) {
-            // todo: if reads have multiple SA tags.. we should have two peices of evidence with the right strands
-            super(read, metadata, atStart ? read.getStart() : read.getEnd(), UNCERTAINTY, read.getCigar().isRightClipped());
+            // todo: if reads have multiple SA tags.. we should have two pieces of evidence with the right strands
+            super(read, metadata, atStart ? read.getStart() : read.getEnd(), UNCERTAINTY, !atStart);
             cigar = read.getCigar().toString();
             if ( cigar.isEmpty() ) throw new GATKException("Read has no cigar string.");
             if (read.hasAttribute(SA_TAG_NAME)) {
@@ -418,20 +418,22 @@ public class BreakpointEvidence {
                     if (! isHighQualityMapping(readMetadata, mapQ, saInterval)) {
                         continue;
                     }
-                    final Cigar cigar = TextCigarCodec.decode(saMapping.getCigar());
-                    if (isForwardStrand() && saMapping.isForwardStrand()) {
-                        supplementaryAlignmentStrands.add(!cigar.isLeftClipped());
-                    } else if (! isForwardStrand() && ! saMapping.isForwardStrand()) {
-                        supplementaryAlignmentStrands.add(cigar.isRightClipped());
-                    } else if (isForwardStrand() && ! saMapping.isForwardStrand()) {
-                        supplementaryAlignmentStrands.add(!cigar.isRightClipped());
-                    } else if (! isForwardStrand() && saMapping.isForwardStrand()) {
-                        supplementaryAlignmentStrands.add(cigar.isLeftClipped());
-                    }
+                    final boolean result = calculateDistalTargetStrand(saMapping, isForwardStrand());
+                    supplementaryAlignmentStrands.add(result);
                 }
                 return supplementaryAlignmentStrands;
             } else {
                 return null;
+            }
+        }
+
+        @VisibleForTesting
+        static boolean calculateDistalTargetStrand(final SAMapping saMapping, final boolean primaryEvidenceRightClipped) {
+            final Cigar cigar = TextCigarCodec.decode(saMapping.getCigar());
+            if (primaryEvidenceRightClipped) {
+                return !cigar.isLeftClipped();
+            } else {
+                return cigar.isRightClipped();
             }
         }
 

@@ -19,8 +19,8 @@ public class EvidenceTargetLinkClusterer {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
             if (nextEvidence.hasDistalTargets(readMetadata)) {
                 final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
-                System.err.println(toBedpeString(nextEvidence, nextEvidence.getLocation(), target, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-                        ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + (nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence ? "DRP" : "SR"), 1));
+                //System.err.println(toBedpeString(nextEvidence, nextEvidence.getLocation(), target, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
+                //        ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + (nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence ? "DRP" : "SR"), 1));
                 EvidenceTargetLink updatedLink = null;
                 for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.overlappers(nextEvidence.getLocation()); it.hasNext(); ) {
                     final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();
@@ -39,11 +39,11 @@ public class EvidenceTargetLinkClusterer {
                                     newTarget,
                                     oldLink.targetForwardStrand,
                                     nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? oldLink.directedWeight : oldLink.directedWeight + 1,
+                                            ? oldLink.splitReads : oldLink.splitReads + 1,
                                     nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? oldLink.undirectedWeight + 1 : oldLink.undirectedWeight);
-                            System.err.println("updating to: " + toBedpeString(nextEvidence, newSource, newTarget, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-                                    ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + "_" + updatedLink.directedWeight + "_" + updatedLink.undirectedWeight, 1));
+                                            ? oldLink.readPairs + 1 : oldLink.readPairs);
+                            //System.err.println("updating to: " + toBedpeString(nextEvidence, newSource, newTarget, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
+//                                    ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + "_" + updatedLink.splitReads + "_" + updatedLink.readPairs, 1));
                             break;
                     }
                 }
@@ -57,8 +57,8 @@ public class EvidenceTargetLinkClusterer {
                                     ? 0 : 1,
                             nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
                                     ? 1 : 0);
-                    System.err.println("creating new: " + toBedpeString(nextEvidence, nextEvidence.getLocation(), nextEvidence.getDistalTargets(readMetadata).get(0), ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-                            ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + "_" + updatedLink.directedWeight + "_" + updatedLink.undirectedWeight, 1));
+                    //System.err.println("creating new: " + toBedpeString(nextEvidence, nextEvidence.getLocation(), nextEvidence.getDistalTargets(readMetadata).get(0), ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
+                    //        ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + "_" + updatedLink.splitReads + "_" + updatedLink.readPairs, 1));
                 }
                 currentIntervalsWithTargets.put(updatedLink.source, updatedLink);
             }

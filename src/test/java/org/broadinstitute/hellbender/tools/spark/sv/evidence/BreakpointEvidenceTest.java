@@ -117,4 +117,72 @@ public class BreakpointEvidenceTest extends BaseTest {
             Assert.assertEquals(evidenceList.get(idx).toString(), evidenceList2.get(idx).toString());
         }
     }
+
+    @Test(groups = "sv")
+    public void testSplitReadFromPrimaryFirstInPair() {
+        final SAMFileHeader samHeader = ArtificialReadUtils.createArtificialSamHeader();
+        final ReadMetadata metadata = new ReadMetadata(Collections.emptySet(), samHeader, stats, null, 2L, 2L, 1);
+        final List<GATKRead> readPair = ArtificialReadUtils.createPair(samHeader, "firstReadPair", 151, 140825480, 140828201, true, false);
+        final GATKRead read = readPair.get(0);
+        read.setAttribute("SA", "1,140828201,+,82S69M,60,1;");
+
+        final BreakpointEvidence.SplitRead splitRead = new BreakpointEvidence.SplitRead(read, metadata, false);
+        Assert.assertTrue(splitRead.isForwardStrand());
+        Assert.assertTrue(splitRead.hasDistalTargets(metadata));
+        final SVInterval targetInterval = splitRead.getDistalTargets(metadata).get(0);
+        Assert.assertEquals(targetInterval, new SVInterval(0, 140828198, 140828274));
+        Assert.assertFalse(splitRead.getDistalTargetStrands(metadata).get(0));
+    }
+
+    @Test(groups = "sv")
+    public void testSplitReadFromPrimarySecondInPair() {
+        final SAMFileHeader samHeader = ArtificialReadUtils.createArtificialSamHeader();
+        final ReadMetadata metadata = new ReadMetadata(Collections.emptySet(), samHeader, stats, null, 2L, 2L, 1);
+        final List<GATKRead> readPair = ArtificialReadUtils.createPair(samHeader, "firstReadPair", 151, 140825480, 140828201, true, false);
+        final GATKRead read = readPair.get(1);
+        read.setAttribute("SA", "1,140825513,-,20S54M77S,60,0;");
+
+        final BreakpointEvidence.SplitRead splitRead = new BreakpointEvidence.SplitRead(read, metadata, true);
+        Assert.assertFalse(splitRead.isForwardStrand());
+        Assert.assertTrue(splitRead.hasDistalTargets(metadata));
+        final SVInterval targetInterval = splitRead.getDistalTargets(metadata).get(0);
+        Assert.assertEquals(targetInterval, new SVInterval(0, 140825510, 140825571));
+        Assert.assertTrue(splitRead.getDistalTargetStrands(metadata).get(0));
+    }
+
+    @Test(groups = "sv")
+    public void testSplitReadFromSupplementaryLeft() {
+        final SAMFileHeader samHeader = ArtificialReadUtils.createArtificialSamHeader();
+        final ReadMetadata metadata = new ReadMetadata(Collections.emptySet(), samHeader, stats, null, 2L, 2L, 1);
+        final GATKRead read = ArtificialReadUtils.createArtificialRead(samHeader, "saRead", 0, 140828201,
+                ArtificialReadUtils.createRandomReadBases(151, false), ArtificialReadUtils.createRandomReadQuals(151), "82S69M");
+        read.setIsSupplementaryAlignment(true);
+        read.setAttribute("SA", "1,140825480,+,87M64S,60,0;");
+
+        final BreakpointEvidence.SplitRead splitRead = new BreakpointEvidence.SplitRead(read, metadata, true);
+        Assert.assertFalse(splitRead.isForwardStrand());
+        Assert.assertTrue(splitRead.hasDistalTargets(metadata));
+        final SVInterval targetInterval = splitRead.getDistalTargets(metadata).get(0);
+        Assert.assertEquals(targetInterval, new SVInterval(0, 140825477, 140825571));
+        Assert.assertTrue(splitRead.getDistalTargetStrands(metadata).get(0));
+    }
+
+    @Test(groups = "sv")
+    public void testSRDistalTargetStrand() {
+        Assert.assertFalse(BreakpointEvidence.SplitRead.calculateDistalTargetStrand(
+                new BreakpointEvidence.SplitRead.SAMapping("3", 140828201, true, "82S69M", 60, 1), true));
+
+        Assert.assertTrue(BreakpointEvidence.SplitRead.calculateDistalTargetStrand(
+                new BreakpointEvidence.SplitRead.SAMapping("3", 140825480, true, "87M64S", 60, 0), false));
+
+        Assert.assertTrue(BreakpointEvidence.SplitRead.calculateDistalTargetStrand(
+                new BreakpointEvidence.SplitRead.SAMapping("3", 140825513, false, "20S54M77S", 60, 0), false));
+
+        Assert.assertFalse(BreakpointEvidence.SplitRead.calculateDistalTargetStrand(
+                new BreakpointEvidence.SplitRead.SAMapping("3", 140828201, false, "69S82M", 60, 0), true));
+
+        Assert.assertTrue(BreakpointEvidence.SplitRead.calculateDistalTargetStrand(
+                new BreakpointEvidence.SplitRead.SAMapping("3", 43593545, false, "81M70S", 60, 2), true));
+
+    }
 }
