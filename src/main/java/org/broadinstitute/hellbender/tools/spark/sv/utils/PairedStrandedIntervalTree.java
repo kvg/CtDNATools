@@ -1,4 +1,4 @@
-package org.broadinstitute.hellbender.tools.spark.sv;
+package org.broadinstitute.hellbender.tools.spark.sv.utils;
 
 import scala.Tuple2;
 

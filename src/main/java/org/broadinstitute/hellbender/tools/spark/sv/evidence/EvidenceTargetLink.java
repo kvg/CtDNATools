@@ -1,9 +1,10 @@
-package org.broadinstitute.hellbender.tools.spark.sv;
+package org.broadinstitute.hellbender.tools.spark.sv.evidence;
 
 import com.esotericsoftware.kryo.DefaultSerializer;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
 
 import java.util.Map;
 import java.util.stream.Collectors;

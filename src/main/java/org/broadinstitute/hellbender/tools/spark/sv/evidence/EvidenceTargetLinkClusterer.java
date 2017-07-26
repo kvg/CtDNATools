@@ -1,4 +1,7 @@
-package org.broadinstitute.hellbender.tools.spark.sv;
+package org.broadinstitute.hellbender.tools.spark.sv.evidence;
+
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
 
 import java.util.ArrayList;
 import java.util.Iterator;

@@ -1,6 +1,7 @@
 package org.broadinstitute.hellbender.tools.spark.sv.evidence;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.PairedStrandedIntervalTree;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
 import org.broadinstitute.hellbender.utils.Utils;
