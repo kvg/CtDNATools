@@ -237,21 +237,7 @@ public class BreakpointEvidence {
             if ( read.isReverseStrand() ) {
                 // we can get a little more precise about the interval by checking to see if there are any leading mismatches
                 // in the read's alignment and trimming them off.
-                int leadingMismatches = 0;
-                if (read.hasAttribute("MD")) {
-                    final String mdString = read.getAttributeAsString("MD");
-                    final List<TextMDCodec.MDElement> mdElements = TextMDCodec.parseMDString(mdString);
-                    int idx = 0;
-                    while (idx < mdElements.size()) {
-                        TextMDCodec.MDElement mdElement = mdElements.get(idx);
-                        if (mdElement instanceof TextMDCodec.MatchMDElement && mdElement.getLength() > 0) {
-                            break;
-                        } else {
-                            leadingMismatches += mdElement.getLength();
-                        }
-                        idx = idx + 1;
-                    }
-                }
+                int leadingMismatches = getLeadingMismatches(read, true);
                 final int readStart = read.getStart() + leadingMismatches;
                 width = readStart - (read.getUnclippedEnd() + 1 - templateLen);
                 start = readStart - width;
@@ -260,28 +246,31 @@ public class BreakpointEvidence {
                     start = 1;
                 }
             } else {
-                // we can get a little more precise about the interval by checking to see if there are any trailing mismatches
-                // in the read's alignment and trimming them off.
-                int trailingMismatches = 0;
-                if (read.hasAttribute("MD")) {
-                    final String mdString = read.getAttributeAsString("MD");
-                    final List<TextMDCodec.MDElement> mdElements = TextMDCodec.parseMDString(mdString);
-                    int idx = mdElements.size() - 1;
-                    while (idx >= 0) {
-                        TextMDCodec.MDElement mdElement = mdElements.get(idx);
-                        if (mdElement instanceof TextMDCodec.MatchMDElement && mdElement.getLength() > 0) {
-                            break;
-                        } else {
-                            trailingMismatches += mdElement.getLength();
-                        }
-                        idx = idx - 1;
-                    }
-                }
+                int trailingMismatches = getLeadingMismatches(read, false);
                 final int readEnd = read.getEnd() + 1 - trailingMismatches;
                 width = read.getUnclippedStart() + templateLen - readEnd;
                 start = readEnd;
             }
             return new SVInterval(metadata.getContigID(read.getContig()), start, start + width);
+        }
+
+        @VisibleForTesting static int getLeadingMismatches(final GATKRead read, final boolean fromStart) {
+            int leadingMismatches = 0;
+            if (read.hasAttribute("MD")) {
+                final String mdString = read.getAttributeAsString("MD");
+                final List<TextMDCodec.MDElement> mdElements = TextMDCodec.parseMDString(mdString);
+                int idx = fromStart ? 0 : (mdElements.size() - 1);
+                while (fromStart ? (idx < mdElements.size()) : (idx >= 0)) {
+                    TextMDCodec.MDElement mdElement = mdElements.get(idx);
+                    if (mdElement instanceof TextMDCodec.MatchMDElement && mdElement.getLength() > 0) {
+                        break;
+                    } else {
+                        leadingMismatches += mdElement.getLength();
+                    }
+                    idx = idx + (fromStart ? 1 : -1);
+                }
+            }
+            return leadingMismatches;
         }
 
         private static SVInterval fixedWidthInterval( final int contigID,

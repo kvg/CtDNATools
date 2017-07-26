@@ -85,6 +85,12 @@ public class BreakpointEvidenceTest extends BaseTest {
         final BreakpointEvidence evidence4 =
                 new BreakpointEvidence.ReadEvidence(read, readMetadata, readStart+readSize+uncertainty, uncertainty, ! read.isReverseStrand());
         Assert.assertEquals(evidence3.toString(), evidence4.toString());
+
+        read.setAttribute("MD", "149AT");
+        final BreakpointEvidence evidence5 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
+        Assert.assertEquals(evidence3.getLocation().getStart() - 2, evidence5.getLocation().getStart());
+
+
     }
 
     @Test(groups = "sv")
@@ -183,6 +189,19 @@ public class BreakpointEvidenceTest extends BaseTest {
 
         Assert.assertTrue(BreakpointEvidence.SplitRead.calculateDistalTargetStrand(
                 new BreakpointEvidence.SplitRead.SAMapping("3", 43593545, false, "81M70S", 60, 2), true));
-
     }
+
+    @Test(groups = "sv")
+    public void testGetLeadingMismatches() {
+        final SAMFileHeader samHeader = ArtificialReadUtils.createArtificialSamHeader();
+        final ReadMetadata metadata = new ReadMetadata(Collections.emptySet(), samHeader, stats, null, 2L, 2L, 1);
+        final GATKRead read = ArtificialReadUtils.createArtificialRead(samHeader, "saRead", 0, 140828201,
+                ArtificialReadUtils.createRandomReadBases(151, false), ArtificialReadUtils.createRandomReadQuals(151), "151M");
+        read.setAttribute( "MD", "AC152T");
+        Assert.assertEquals(2, BreakpointEvidence.ReadEvidence.getLeadingMismatches(read, true));
+        Assert.assertEquals(1, BreakpointEvidence.ReadEvidence.getLeadingMismatches(read, false));
+        read.setAttribute( "MD", "0AC152T");
+        Assert.assertEquals(2, BreakpointEvidence.ReadEvidence.getLeadingMismatches(read, true));
+    }
+
 }
