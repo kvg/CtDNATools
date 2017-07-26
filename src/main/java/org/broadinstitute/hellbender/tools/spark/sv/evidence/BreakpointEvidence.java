@@ -435,7 +435,7 @@ public class BreakpointEvidence {
             final Cigar cigar = TextCigarCodec.decode(saMapping.getCigar());
 
             return new SVInterval( contigId,
-                    pos - UNCERTAINTY,
+                    Math.max(1, pos - UNCERTAINTY),
                     pos + cigar.getPaddedReferenceLength() + UNCERTAINTY + 1);
 
         }
@@ -565,7 +565,6 @@ public class BreakpointEvidence {
     public static abstract class DiscordantReadPairEvidence extends ReadEvidence {
         protected final SVInterval target;
         protected final boolean targetForwardStrand;
-        // todo: it would be more efficient and simple to just not have a distal target if the quality is so low
         protected final int targetQuality;
 
         // even if we have access to and use the mate cigar, we still don't really know the exact breakpoint interval
@@ -642,8 +641,12 @@ public class BreakpointEvidence {
                 mateAlignmentLength = read.getLength();
             }
             return new SVInterval(mateContigIndex,
-                    Math.max(0, mateReverseStrand ? mateStartPosition - maxAllowableFragmentSize + mateAlignmentLength : mateStartPosition + mateAlignmentLength - MATE_ALIGNMENT_LENGTH_UNCERTAINTY),
-                    mateReverseStrand ? mateStartPosition + MATE_ALIGNMENT_LENGTH_UNCERTAINTY : mateStartPosition + maxAllowableFragmentSize);
+                    Math.max(0, mateReverseStrand ?
+                                    mateStartPosition - maxAllowableFragmentSize + mateAlignmentLength :
+                                    mateStartPosition + mateAlignmentLength - MATE_ALIGNMENT_LENGTH_UNCERTAINTY),
+                    mateReverseStrand ?
+                            mateStartPosition + MATE_ALIGNMENT_LENGTH_UNCERTAINTY :
+                            mateStartPosition + maxAllowableFragmentSize);
         }
 
         protected boolean getMateForwardStrand(final GATKRead read) {
