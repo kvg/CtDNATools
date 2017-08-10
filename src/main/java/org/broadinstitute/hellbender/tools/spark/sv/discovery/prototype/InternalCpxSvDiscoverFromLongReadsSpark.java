@@ -103,10 +103,10 @@ public final class InternalCpxSvDiscoverFromLongReadsSpark extends GATKSparkTool
                         ctx.broadcast(getReference()), discoverStageArgs.fastaReference, getAuthenticatedGCSOptions(),
                         localLogger);
 
-//        new ForSimpleStrandSwitch()
-//                .inferSvAndWriteVCF(splitUpLongReads.get(RawTypes.Inv), outputDir+"/"+RawTypes.Inv.name()+".vcf",
-//                        ctx.broadcast(getReference()), discoverStageArgs.fastaReference, getAuthenticatedGCSOptions(),
-//                        localLogger);
+        new ForSimpleStrandSwitch()
+                .inferSvAndWriteVCF(splitUpLongReads.get(RawTypes.Inv), outputDir+"/"+RawTypes.Inv.name()+".vcf",
+                        ctx.broadcast(getReference()), discoverStageArgs.fastaReference, getAuthenticatedGCSOptions(),
+                        localLogger);
     }
 
     private enum RawTypes {
