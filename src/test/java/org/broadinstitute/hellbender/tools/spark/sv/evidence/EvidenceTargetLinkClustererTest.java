@@ -2,9 +2,11 @@ package org.broadinstitute.hellbender.tools.spark.sv.evidence;
 
 import htsjdk.samtools.SAMFileHeader;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
 import org.broadinstitute.hellbender.utils.IntHistogramTest;
 import org.broadinstitute.hellbender.utils.read.ArtificialReadUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -87,5 +89,37 @@ public class EvidenceTargetLinkClustererTest {
             assertEquals(nextActual, nextExpected);
         }
         assertTrue(!results.hasNext());
+    }
+
+    @Test
+    public void testDeduplicateTargetLinks() throws Exception {
+        final ArrayList<EvidenceTargetLink> evidenceTargetLinks = new ArrayList<>();
+        evidenceTargetLinks.add(new EvidenceTargetLink(new SVInterval(0, 100, 200), true, new SVInterval(0, 500, 600), false, 3, 1));
+        evidenceTargetLinks.add(new EvidenceTargetLink(new SVInterval(0, 125, 400), false, new SVInterval(0, 500, 600), false, 5, 5));
+        evidenceTargetLinks.add(new EvidenceTargetLink(new SVInterval(0, 550, 650), false, new SVInterval(0, 150, 250), true, 1, 2));
+
+        List<EvidenceTargetLink> entries = EvidenceTargetLinkClusterer.deduplicateTargetLinks(evidenceTargetLinks);
+        Assert.assertEquals(entries.size(), 2);
+        Iterator<EvidenceTargetLink> iterator = entries.iterator();
+        EvidenceTargetLink next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 125, 400), false, new SVInterval(0, 500, 600), false, 5, 5));
+
+        next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 200), true, new SVInterval(0, 550, 600), false, 3, 2));
+
+        evidenceTargetLinks.add(new EvidenceTargetLink(new SVInterval(0, 100, 200), false, new SVInterval(0, 800, 900), true, 7, 8));
+
+        entries = EvidenceTargetLinkClusterer.deduplicateTargetLinks(evidenceTargetLinks);
+        Assert.assertEquals(entries.size(), 3);
+        iterator = entries.iterator();
+
+        next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 100, 200), false, new SVInterval(0, 800, 900), true, 7, 8));
+
+        next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 125, 400), false, new SVInterval(0, 500, 600), false, 5, 5));
+
+        next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 200), true, new SVInterval(0, 550, 600), false, 3, 2));
     }
 }

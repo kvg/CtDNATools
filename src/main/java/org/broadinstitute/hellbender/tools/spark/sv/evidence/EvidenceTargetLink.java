@@ -4,6 +4,7 @@ import com.esotericsoftware.kryo.DefaultSerializer;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.PairedStrandedIntervals;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
 
 import java.util.Map;
@@ -62,6 +63,10 @@ class EvidenceTargetLink {
         return contigIdToContigNameMap.get(source.getContig()) + "_" + (source.getStart() - 1) + "_" + source.getEnd() +
                 "_" + contigIdToContigNameMap.get(target.getContig()) + "_" + (target.getStart() - 1) + "_" + target.getEnd() +
                 "_" + (sourceForwardStrand ? "P" : "M")  + (targetForwardStrand ? "P" : "M") + "_" + splitReads + "_" + readPairs;
+    }
+
+    public PairedStrandedIntervals getPairedStrandedIntervals() {
+        return new PairedStrandedIntervals(source, sourceForwardStrand, target, targetForwardStrand);
     }
 
     public static final class Serializer extends com.esotericsoftware.kryo.Serializer<EvidenceTargetLink> {

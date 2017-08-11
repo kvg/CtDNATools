@@ -634,36 +634,15 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                     final EvidenceTargetLinkClusterer clusterer = new EvidenceTargetLinkClusterer(readMetadata);
                     return clusterer.cluster(itr);
                 })
-                .filter(link -> link.readPairs > 2 || link.splitReads > 0);
-
-        // todo: add the partition-edge links if any
+                .filter(link -> link.readPairs >= 2 || link.splitReads >= 1);
 
         final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
 
-        //System.err.println("got links...");
-        //evidenceTargetLinks.stream().forEach(e -> System.err.println(e.toBedpeString(broadcastMetadata.getValue())));
-        //System.err.println("deduplicating...");
-
-        final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = deduplicateTargetLinks(evidenceTargetLinks);
+        final List<EvidenceTargetLink> targetLinkSourceTree = EvidenceTargetLinkClusterer.deduplicateTargetLinks(evidenceTargetLinks);
 
         log("Collected " + targetLinkSourceTree.size() + " evidence target links", logger);
 
-        if ( params.targetLinkFile != null ) {
-            try (final OutputStreamWriter writer =
-                         new OutputStreamWriter(new BufferedOutputStream(BucketUtils.createFile(params.targetLinkFile)))) {
-                targetLinkSourceTree.iterator().forEachRemaining(entry -> {
-                    final String bedpeRecord = entry.getValue().toBedpeString(broadcastMetadata.getValue());
-                    try {
-                        //System.err.println(bedpeRecord);
-                        writer.write(bedpeRecord + "\n");
-                    } catch (final IOException ioe) {
-                        throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
-                    }
-                });
-            } catch ( final IOException ioe ) {
-                throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
-            }
-        }
+        writeTargetLinks(params, broadcastMetadata, targetLinkSourceTree);
 
         final JavaRDD<BreakpointEvidence> filteredEvidenceRDD =
                 evidenceRDD
@@ -748,36 +727,22 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         return intervals;
     }
 
-    private static SVIntervalTree<EvidenceTargetLink> deduplicateTargetLinks(final List<EvidenceTargetLink> evidenceTargetLinks) {
-        // todo: if identical source intervals we should have a list in each entry
-        final SVIntervalTree<EvidenceTargetLink> targetLinkSourceTree = new SVIntervalTree<>();
-
-        evidenceTargetLinks.stream().filter(link -> link.source.compareTo(link.target) < 0).forEach(link -> targetLinkSourceTree.put(link.source, link));
-
-        evidenceTargetLinks.stream().filter(link -> link.source.compareTo(link.target) >= 0).forEach(link -> {
-            final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> overlappers = targetLinkSourceTree.overlappers(link.target);
-            EvidenceTargetLink newLink = null;
-            while (overlappers.hasNext()) {
-                final SVIntervalTree.Entry<EvidenceTargetLink> entry = overlappers.next();
-                final EvidenceTargetLink existingLink = entry.getValue();
-                if (existingLink.source.overlaps(link.target) && existingLink.sourceForwardStrand == link.targetForwardStrand &&
-                        existingLink.target.overlaps(link.source) && existingLink.targetForwardStrand == link.sourceForwardStrand) {
-                    newLink = new EvidenceTargetLink(link.target.intersect(existingLink.source), link.targetForwardStrand,
-                            link.source.intersect(existingLink.target), link.sourceForwardStrand,
-                            Math.max(link.splitReads, existingLink.splitReads), Math.max(link.readPairs, existingLink.readPairs));
-                    overlappers.remove();
-                    break;
-                }
+    private static void writeTargetLinks(final FindBreakpointEvidenceSparkArgumentCollection params, final Broadcast<ReadMetadata> broadcastMetadata, final List<EvidenceTargetLink> targetLinks) {
+        if ( params.targetLinkFile != null ) {
+            try (final OutputStreamWriter writer =
+                         new OutputStreamWriter(new BufferedOutputStream(BucketUtils.createFile(params.targetLinkFile)))) {
+                targetLinks.iterator().forEachRemaining(entry -> {
+                    final String bedpeRecord = entry.toBedpeString(broadcastMetadata.getValue());
+                    try {
+                        writer.write(bedpeRecord + "\n");
+                    } catch (final IOException ioe) {
+                        throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
+                    }
+                });
+            } catch ( final IOException ioe ) {
+                throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
             }
-            if (newLink != null) {
-                targetLinkSourceTree.put(newLink.source, newLink);
-            } else {
-                targetLinkSourceTree.put(link.target, new EvidenceTargetLink(link.target, link.targetForwardStrand, link.source, link.sourceForwardStrand, link.splitReads, link.readPairs));
-            }
-
-        });
-
-        return targetLinkSourceTree;
+        }
     }
 
 

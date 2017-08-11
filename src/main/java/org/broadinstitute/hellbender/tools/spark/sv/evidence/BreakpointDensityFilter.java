@@ -2,9 +2,11 @@ package org.broadinstitute.hellbender.tools.spark.sv.evidence;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.PairedStrandedIntervalTree;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.PairedStrandedIntervals;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
 import org.broadinstitute.hellbender.utils.Utils;
+import scala.Tuple2;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -91,7 +93,7 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
 
     @VisibleForTesting boolean hasEnoughOverlappers( final SVInterval interval ) {
         final Iterator<SVIntervalTree.Entry<List<BreakpointEvidence>>> itr = evidenceTree.overlappers(interval);
-        PairedStrandedIntervalTree targetIntervalTree = new PairedStrandedIntervalTree();
+        PairedStrandedIntervalTree<BreakpointEvidence> targetIntervalTree = new PairedStrandedIntervalTree<>();
         int weight = 0;
         while ( itr.hasNext() ) {
             final List<BreakpointEvidence> evidenceForInterval = itr.next().getValue();
@@ -105,19 +107,21 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
                 if (evidence.hasDistalTargets(readMetadata)) {
                     final List<SVInterval> distalTargets = evidence.getDistalTargets(readMetadata);
                     for (int i = 0; i < distalTargets.size(); i++) {
-                        targetIntervalTree.put(new PairedStrandedIntervalTree.PairedStrandedIntervals(
-                                evidence.getLocation(), evidence.isForwardStrand(),
-                                distalTargets.get(i), evidence.getDistalTargetStrands(readMetadata).get(i)
-                                ));
+                        targetIntervalTree.put(
+                                new PairedStrandedIntervals(
+                                        evidence.getLocation(), evidence.isForwardStrand(),
+                                        distalTargets.get(i), evidence.getDistalTargetStrands(readMetadata).get(i)),
+                                evidence
+                                );
                     }
                 }
             }
         }
 
-        final Iterator<PairedStrandedIntervalTree.PairedStrandedIntervals> targetLinkIterator = targetIntervalTree.iterator();
+        final Iterator<Tuple2<PairedStrandedIntervals, BreakpointEvidence>> targetLinkIterator = targetIntervalTree.iterator();
         while (targetLinkIterator.hasNext()) {
-            PairedStrandedIntervalTree.PairedStrandedIntervals next = targetLinkIterator.next();
-            final int coherentEvidenceWeight = (int) Utils.stream(targetIntervalTree.overlappers(next)).count();
+            Tuple2<PairedStrandedIntervals, BreakpointEvidence> next = targetLinkIterator.next();
+            final int coherentEvidenceWeight = (int) Utils.stream(targetIntervalTree.overlappers(next._1())).count();
             if (coherentEvidenceWeight >= minCoherentEvidenceWeight) {
                 //System.err.println("validating for coherent weight: "+ coherentEvidenceWeight);
                 return true;
