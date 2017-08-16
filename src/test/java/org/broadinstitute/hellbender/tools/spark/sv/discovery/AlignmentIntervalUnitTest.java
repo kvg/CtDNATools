@@ -4,15 +4,20 @@ import htsjdk.samtools.Cigar;
 import htsjdk.samtools.SAMFlag;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.TextCigarCodec;
+import org.apache.avro.generic.GenericData;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SVFastqUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.bwa.BwaMemAlignment;
 import org.broadinstitute.hellbender.utils.bwa.BwaMemAlignmentUtils;
 import org.broadinstitute.hellbender.utils.read.CigarUtils;
+import org.broadinstitute.hellbender.utils.read.GATKRead;
+import org.broadinstitute.hellbender.utils.read.SAMRecordToGATKReadAdapter;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -71,9 +76,13 @@ public class AlignmentIntervalUnitTest extends BaseTest {
         final Cigar[] cigars = Arrays.stream(cigarStrings).map(TextCigarCodec::decode).toArray(Cigar[]::new);
 
 
+
         final Object[][] data = new Object[cigars.length][];
         for(int i=0; i<cigars.length; ++i) {
-            final BwaMemAlignment bwaMemAlignment = new BwaMemAlignment(strandedness[i] ? 0 : SAMFlag.READ_REVERSE_STRAND.intValue(),
+            int samFlag = 0;
+            if ( !strandedness[i] ) samFlag = SAMFlag.READ_REVERSE_STRAND.intValue();
+            if ( cigarStrings[i].indexOf('H') != -1 ) samFlag |= SAMFlag.SUPPLEMENTARY_ALIGNMENT.intValue();
+            final BwaMemAlignment bwaMemAlignment = new BwaMemAlignment(samFlag,
                     0, alignmentStartsOnRef_0Based[i], alignmentStartsOnRef_0Based[i]+cigars[i].getReferenceLength(),
                     strandedness[i] ? alignmentStartsOnTig_0BasedInclusive[i] : seqLen[i]-alignmentEndsOnTig_0BasedExclusive[i],
                     strandedness[i] ? alignmentEndsOnTig_0BasedExclusive[i] : seqLen[i]-alignmentStartsOnTig_0BasedInclusive[i],
@@ -118,5 +127,57 @@ public class AlignmentIntervalUnitTest extends BaseTest {
         Assert.assertEquals(alignmentInterval.endInAssembledContig, expectedEndOnContig_1BasedInclusive);
         Assert.assertEquals(alignmentInterval.mapQual, Math.max(SAMRecord.NO_MAPPING_QUALITY,expectedMapQualInBwaMemAlignment));
         Assert.assertEquals(alignmentInterval, expectedAlignmentInterval);
+    }
+
+    @Test(dataProvider = "AlignmentIntervalCtorTestForSimpleInversion", groups = "sv")
+    public void testConstructionFromGATKRead(final BwaMemAlignment bwaMemAlignment, final SimpleInterval expectedReferenceInterval, final Cigar expectedCigar,
+                                              final boolean expectedIsPositiveStrand, final int expectedStartOnContig_1BasedInclusive, final int expectedEndOnContig_1BasedInclusive,
+                                              final int expectedContigLength, final int expectedMapQualInBwaMemAlignment, final AlignmentInterval expectedAlignmentInterval) {
+
+        final SAMRecord samRecord = BwaMemAlignmentUtils.applyAlignment("whatever", SVDiscoveryTestDataProvider.makeDummySequence(expectedContigLength, (byte)'A'), null, null, bwaMemAlignment, refNames, hg19Header, false, false);
+        final GATKRead read = new SAMRecordToGATKReadAdapter(samRecord);
+        final AlignmentInterval alignmentInterval = new AlignmentInterval(read);
+        Assert.assertEquals(alignmentInterval.referenceSpan, expectedReferenceInterval);
+        Assert.assertEquals(alignmentInterval.cigarAlong5to3DirectionOfContig, expectedCigar);
+        Assert.assertEquals(alignmentInterval.forwardStrand, expectedIsPositiveStrand);
+        Assert.assertEquals(alignmentInterval.startInAssembledContig, expectedStartOnContig_1BasedInclusive);
+        Assert.assertEquals(alignmentInterval.endInAssembledContig, expectedEndOnContig_1BasedInclusive);
+        Assert.assertEquals(alignmentInterval.mapQual, Math.max(SAMRecord.NO_MAPPING_QUALITY,expectedMapQualInBwaMemAlignment));
+        Assert.assertEquals(alignmentInterval, expectedAlignmentInterval);
+    }
+
+    @DataProvider(name = "alignmentIntervalStrings")
+    public Object[][] alignmentIntervalStrings() {
+        final List<Object[]> result = new ArrayList<>();
+        result.add(new Object[]{ "chr1", 10, SVFastqUtils.Strand.NEGATIVE, "10M1I30M100H", 10, 3, 2 });
+        result.add(new Object[]{ "chrX", 10_000_000, SVFastqUtils.Strand.POSITIVE, "31H10S10M1I30M230N4M100H", 34, 31, 0 });
+        result.add(new Object[]{ "chr20", 3456, SVFastqUtils.Strand.POSITIVE, "31M", 3, 310, 5 });
+        return result.toArray(new Object[result.size()][]);
+    }
+
+    @Test(dataProvider = "alignmentIntervalStrings", groups = "sv")
+    public void testAlignmentIntervalStrings(final String contig, final int start, final SVFastqUtils.Strand strand, final String cigarString, final int mq, final int nm, final int as) {
+        final String fullStr = String.join(",", contig, "" + start, strand == SVFastqUtils.Strand.NEGATIVE ? "-" : "+", cigarString, "" + mq, "" + nm, "" + as);
+        final AlignmentInterval fullInterval = new AlignmentInterval(fullStr);
+        Assert.assertEquals(fullInterval.referenceSpan.getContig(), contig);
+        Assert.assertEquals(fullInterval.referenceSpan.getStart(), start);
+        Assert.assertEquals(fullInterval.forwardStrand, strand == SVFastqUtils.Strand.POSITIVE);
+        Assert.assertEquals(fullInterval.cigarAlong5to3DirectionOfContig,
+                fullInterval.forwardStrand ? TextCigarCodec.decode(cigarString) : CigarUtils.invertCigar(TextCigarCodec.decode(cigarString)));
+        Assert.assertEquals(fullInterval.mapQual, mq);
+        Assert.assertEquals(fullInterval.mismatches, nm);
+        Assert.assertEquals(fullInterval.alnScore, as);
+
+        final String basicStr = String.join(",", contig, "" + start, strand == SVFastqUtils.Strand.NEGATIVE ? "-" : "+", cigarString);
+        final AlignmentInterval basicInterval = new AlignmentInterval(basicStr);
+        Assert.assertEquals(basicInterval.referenceSpan.getContig(), contig);
+        Assert.assertEquals(basicInterval.referenceSpan.getStart(), start);
+        Assert.assertEquals(basicInterval.forwardStrand, strand == SVFastqUtils.Strand.POSITIVE);
+        Assert.assertEquals(basicInterval.cigarAlong5to3DirectionOfContig,
+                basicInterval.forwardStrand ? TextCigarCodec.decode(cigarString) : CigarUtils.invertCigar(TextCigarCodec.decode(cigarString)));
+        Assert.assertEquals(basicInterval.mapQual, 0);
+        Assert.assertEquals(basicInterval.mismatches, AlignmentInterval.MISSING_NM);
+        Assert.assertEquals(basicInterval.alnScore, AlignmentInterval.MISSING_AS);
+
     }
 }
