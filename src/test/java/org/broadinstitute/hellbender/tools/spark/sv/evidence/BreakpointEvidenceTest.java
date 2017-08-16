@@ -24,38 +24,6 @@ public class BreakpointEvidenceTest extends BaseTest {
                     60000000000L, 600000000L, 3000000000L);
 
     @Test(groups = "sv")
-    void restOfFragmentSizeReverseReadTest() {
-        final SAMFileHeader header = ArtificialReadUtils.createArtificialSamHeaderWithGroups(1, 1, 10000000, 1);
-        final String groupName = header.getReadGroups().get(0).getReadGroupId();
-        final int readSize = 151;
-        final ReadMetadata readMetadata = new ReadMetadata(Collections.emptySet(), header, stats, null, 1L, 1L, 1);
-        final String templateName = "xyzzy";
-        final int readStart = 1010101;
-        final GATKRead read = ArtificialReadUtils.createArtificialRead(header, templateName, 0, readStart, readSize);
-        read.setIsPaired(false);
-        read.setIsReverseStrand(true);
-        read.setReadGroup(groupName);
-        final BreakpointEvidence.ReadEvidence evidence1 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-        final int evidenceWidth = readMetadata.getFragmentLengthStatistics(groupName).getMaxNonOutlierFragmentSize() - readSize;
-        // otherwise the test below will break as it is currently structured
-        Assert.assertTrue(evidenceWidth % 2 == 0);
-        final int uncertainty = evidenceWidth /2;
-        final int evidenceLocus = readStart - uncertainty;
-        final BreakpointEvidence evidence2 =
-                new BreakpointEvidence.ReadEvidence(read, readMetadata, evidenceLocus, uncertainty, ! read.isReverseStrand());
-        Assert.assertEquals(evidence1.getLocation(), new SVInterval(0,evidenceLocus-uncertainty,evidenceLocus+uncertainty));
-        Assert.assertEquals(evidence1.getLocation().getLength(), 2*uncertainty);
-        Assert.assertEquals(evidence1.getTemplateName(), templateName);
-        Assert.assertEquals(evidence1.getFragmentOrdinal(), TemplateFragmentOrdinal.UNPAIRED);
-        Assert.assertEquals(evidence1.toString(), evidence2.toString());
-        read.setIsReverseStrand(false);
-        final BreakpointEvidence evidence3 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-        final BreakpointEvidence evidence4 =
-                new BreakpointEvidence.ReadEvidence(read, readMetadata, readStart+readSize+uncertainty, uncertainty, ! read.isReverseStrand());
-        Assert.assertEquals(evidence3.toString(), evidence4.toString());
-    }
-
-    @Test(groups = "sv")
     void restOfFragmentSizeForwardReadTest() {
         final SAMFileHeader header = ArtificialReadUtils.createArtificialSamHeaderWithGroups(1, 1, 10000000, 1);
         final String groupName = header.getReadGroups().get(0).getReadGroupId();
@@ -68,27 +36,29 @@ public class BreakpointEvidenceTest extends BaseTest {
         read.setIsReverseStrand(false);
         read.setReadGroup(groupName);
         final BreakpointEvidence.ReadEvidence evidence1 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
+
         final int evidenceWidth = readMetadata.getFragmentLengthStatistics(groupName).getMaxNonOutlierFragmentSize() - readSize;
-        // otherwise the test below will break as it is currently structured
-        Assert.assertTrue(evidenceWidth % 2 == 0);
         final int uncertainty = evidenceWidth /2;
         final int evidenceLocus = read.getEnd() + 1 + uncertainty;
-        final BreakpointEvidence evidence2 =
-                new BreakpointEvidence.ReadEvidence(read, readMetadata, evidenceLocus, uncertainty, true);
-        Assert.assertEquals(evidence1.getLocation(), new SVInterval(0,evidenceLocus-uncertainty,evidenceLocus+uncertainty));
-        Assert.assertEquals(evidence1.getLocation().getLength(), 2*uncertainty);
+
+        Assert.assertEquals(evidence1.getLocation(), new SVInterval(0,evidenceLocus-uncertainty,evidenceLocus+ uncertainty + (evidenceWidth % 2 == 0 ? 0 : 1)));
+        Assert.assertEquals(evidence1.getLocation().getLength(), 2*uncertainty + (evidenceWidth % 2 == 0 ? 0 : 1));
         Assert.assertEquals(evidence1.getTemplateName(), templateName);
         Assert.assertEquals(evidence1.getFragmentOrdinal(), TemplateFragmentOrdinal.UNPAIRED);
-        Assert.assertEquals(evidence1.toString(), evidence2.toString());
-        read.setIsReverseStrand(false);
-        final BreakpointEvidence evidence3 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-        final BreakpointEvidence evidence4 =
-                new BreakpointEvidence.ReadEvidence(read, readMetadata, readStart+readSize+uncertainty, uncertainty, ! read.isReverseStrand());
-        Assert.assertEquals(evidence3.toString(), evidence4.toString());
+
+        read.setIsReverseStrand(true);
+        final BreakpointEvidence evidence2 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
+//        final BreakpointEvidence evidence4 =
+//                new BreakpointEvidence.ReadEvidence(read, readMetadata, readStart+readSize+uncertainty, uncertainty, ! read.isReverseStrand());
+//        Assert.assertEquals(evidence2.toString(), evidence4.toString());
+
+        final int evidenceLocus2 = read.getStart() - 1 - uncertainty;
+        Assert.assertEquals(evidence2.getLocation(), new SVInterval(0,evidenceLocus2-uncertainty,evidenceLocus2+ uncertainty + (evidenceWidth % 2 == 0 ? 0 : 1)));
+        Assert.assertEquals(evidence2.getLocation().getLength(), 2*uncertainty + (evidenceWidth % 2 == 0 ? 0 : 1));
 
         read.setAttribute("MD", "149AT");
         final BreakpointEvidence evidence5 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-        Assert.assertEquals(evidence3.getLocation().getStart() - 2, evidence5.getLocation().getStart());
+        Assert.assertEquals(evidence2.getLocation().getStart(), evidence5.getLocation().getStart());
 
 
     }

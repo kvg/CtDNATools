@@ -632,7 +632,9 @@ public class BreakpointEvidence {
             final int mateContigIndex = metadata.getContigID(read.getMateContig());
             final int mateStartPosition = read.getMateStart();
             final boolean mateReverseStrand = read.mateIsReverseStrand();
+
             final int maxAllowableFragmentSize = metadata.getFragmentLengthStatistics(read.getReadGroup()).getMaxNonOutlierFragmentSize();
+
             final int mateAlignmentLength;
             // if the read has an MC attribute we don't have to assume the aligned read length of the mate
             if (read.hasAttribute("MC")) {

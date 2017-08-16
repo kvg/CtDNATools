@@ -27,8 +27,8 @@ public class EvidenceTargetLinkClusterer {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
             if (nextEvidence.hasDistalTargets(readMetadata)) {
                 final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
-                //System.err.println(toBedpeString(nextEvidence, nextEvidence.getLocation(), target, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-                //        ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + (nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence ? "DRP" : "SR"), 1));
+                System.err.println(toBedpeString(nextEvidence, nextEvidence.getLocation(), target, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
+                        ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + (nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence ? "DRP" : "SR"), 1));
                 EvidenceTargetLink updatedLink = null;
                 for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.overlappers(nextEvidence.getLocation()); it.hasNext(); ) {
                     final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();
@@ -96,7 +96,7 @@ public class EvidenceTargetLinkClusterer {
      * the links will be combined as long as strands agree. Returned links have the intersection of two paired intervals as
      * source and target, with the lower-coordinate interval appearing as source.
      */
-    static List<EvidenceTargetLink> deduplicateTargetLinks(final List<EvidenceTargetLink> evidenceTargetLinks) {
+    public static List<EvidenceTargetLink> deduplicateTargetLinks(final List<EvidenceTargetLink> evidenceTargetLinks) {
 
         PairedStrandedIntervalTree<EvidenceTargetLink> pairedStrandedIntervalTree = new PairedStrandedIntervalTree<>();
 
@@ -116,7 +116,7 @@ public class EvidenceTargetLinkClusterer {
                 EvidenceTargetLink existingLink = psiOverlappers.next()._2();
                 newLink = new EvidenceTargetLink(link.target.intersect(existingLink.source), link.targetForwardStrand,
                         link.source.intersect(existingLink.target), link.sourceForwardStrand,
-                        Math.max(link.splitReads, existingLink.splitReads), Math.max(link.readPairs, existingLink.readPairs));
+                        link.splitReads + existingLink.splitReads, Math.max(link.readPairs, existingLink.readPairs));
                 psiOverlappers.remove();
                 break;
             }

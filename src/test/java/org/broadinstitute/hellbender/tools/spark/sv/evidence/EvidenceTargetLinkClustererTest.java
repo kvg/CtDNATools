@@ -105,7 +105,7 @@ public class EvidenceTargetLinkClustererTest {
         Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 125, 400), false, new SVInterval(0, 500, 600), false, 5, 5));
 
         next = iterator.next();
-        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 200), true, new SVInterval(0, 550, 600), false, 3, 2));
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 200), true, new SVInterval(0, 550, 600), false, 4, 2));
 
         evidenceTargetLinks.add(new EvidenceTargetLink(new SVInterval(0, 100, 200), false, new SVInterval(0, 800, 900), true, 7, 8));
 
@@ -120,6 +120,6 @@ public class EvidenceTargetLinkClustererTest {
         Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 125, 400), false, new SVInterval(0, 500, 600), false, 5, 5));
 
         next = iterator.next();
-        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 200), true, new SVInterval(0, 550, 600), false, 3, 2));
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 200), true, new SVInterval(0, 550, 600), false, 4, 2));
     }
 }

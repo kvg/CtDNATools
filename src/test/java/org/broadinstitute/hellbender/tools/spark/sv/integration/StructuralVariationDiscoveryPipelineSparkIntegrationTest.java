@@ -65,6 +65,7 @@ public class StructuralVariationDiscoveryPipelineSparkIntegrationTest extends Co
         tempDirLeft.deleteOnExit();
         Files.createDirectories(Paths.get(tempDirLeft.getAbsolutePath()+"/fastq"));
         tests.add(new Object[]{new StructuralVariationDiscoveryPipelineSparkIntegrationTest.StructuralVariationDiscoveryPipelineSparkIntegrationTestArgs(SVIntegrationTestDataProvider.TEST_BAM_LEFT, SVIntegrationTestDataProvider.KMER_KILL_LIST, SVIntegrationTestDataProvider.ALIGNER_INDEX_IMG, tempDirLeft.getAbsolutePath())});
+
         final File tempDirRight = BaseTest.createTempDir("forRight");
         tempDirRight.deleteOnExit();
         Files.createDirectories(Paths.get(tempDirRight.getAbsolutePath()+"/fastq"));

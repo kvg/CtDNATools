@@ -633,8 +633,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                     final ReadMetadata readMetadata = broadcastMetadata.getValue();
                     final EvidenceTargetLinkClusterer clusterer = new EvidenceTargetLinkClusterer(readMetadata);
                     return clusterer.cluster(itr);
-                })
-                .filter(link -> link.readPairs >= 2 || link.splitReads >= 1);
+                }).filter(link -> link.readPairs >= 2 || link.splitReads >= 1);
 
         final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
 
