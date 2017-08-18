@@ -10,6 +10,7 @@ import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.*;
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchSet;
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchUniqueMultiMap;
+import org.broadinstitute.hellbender.tools.spark.utils.IntHistogram;
 import org.broadinstitute.hellbender.utils.IntHistogramTest;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
@@ -25,7 +26,7 @@ import static org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDi
 
 public final class FindBreakpointEvidenceSparkUnitTest extends BaseTest {
     private static final SVInterval[] testIntervals =
-            { new SVInterval(1, 43349732, 43350393), new SVInterval(1, 43353208, 43353870) };
+            { new SVInterval(1, 43349482, 43350671), new SVInterval(1, 43353045, 43354041) };
 
     private final String readsFile = largeFileTestDir + "SVIntegrationTest.bam";
     private final String toolDir = getToolTestDataDir();
@@ -43,7 +44,8 @@ public final class FindBreakpointEvidenceSparkUnitTest extends BaseTest {
     private final SVReadFilter filter = new SVReadFilter(params);
     private final ReadMetadata readMetadataExpected =
             new ReadMetadata(Collections.emptySet(), header,
-                                new FragmentLengthStatistics(IntHistogramTest.genLogNormalSample(400, 40, 10000)),
+                                new LibraryStatistics(new IntHistogram.CDF(IntHistogramTest.genLogNormalSample(320, 129, 10000)),
+                                        60000000000L, 600000000L, 3000000000L),
                 new ReadMetadata.PartitionBounds[]{ new ReadMetadata.PartitionBounds(0, 1, 100, 10000)}, 100, 10, 30);
     private final Broadcast<ReadMetadata> broadcastMetadata = ctx.broadcast(readMetadataExpected);
     private final Set<String> expectedQNames = loadExpectedQNames(qNamesFile);

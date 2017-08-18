@@ -724,7 +724,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
             intervals.add(evidenceIterator2.next().getLocation());
         }
 
-        return new Tuple2(intervals, evidenceTargetLinks);
+        return new Tuple2<>(intervals, evidenceTargetLinks);
     }
 
     private static void writeTargetLinks(final FindBreakpointEvidenceSparkArgumentCollection params, final Broadcast<ReadMetadata> broadcastMetadata, final List<EvidenceTargetLink> targetLinks) {

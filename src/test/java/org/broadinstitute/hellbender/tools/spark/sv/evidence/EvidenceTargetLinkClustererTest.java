@@ -2,7 +2,7 @@ package org.broadinstitute.hellbender.tools.spark.sv.evidence;
 
 import htsjdk.samtools.SAMFileHeader;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
+import org.broadinstitute.hellbender.tools.spark.utils.IntHistogram;
 import org.broadinstitute.hellbender.utils.IntHistogramTest;
 import org.broadinstitute.hellbender.utils.read.ArtificialReadUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
@@ -31,7 +31,8 @@ public class EvidenceTargetLinkClustererTest {
         partitionBounds[1] = new ReadMetadata.PartitionBounds(0, 10001, 0, 20000);
         partitionBounds[2] = new ReadMetadata.PartitionBounds(0, 20001, 0, 30000);
         return new ReadMetadata(Collections.emptySet(), artificialSamHeader,
-                new FragmentLengthStatistics(IntHistogramTest.genLogNormalSample(350, 40, 10000)),
+                new LibraryStatistics(new IntHistogram.CDF(IntHistogramTest.genLogNormalSample(350, 40, 10000)),
+                        60000000000L, 600000000L, 3000000000L),
                 partitionBounds, 100, 10, 30);
     }
 
