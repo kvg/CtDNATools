@@ -31,6 +31,7 @@ import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.read.SAMRecordToGATKReadAdapter;
 import scala.Tuple2;
+import scala.Tuple3;
 
 import java.io.*;
 import java.util.*;
@@ -88,7 +89,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
      *
      * @return the in-memory representation of assembled contigs alignments, whose length equals the number of local assemblies (regardless of success of failure status)
      */
-    public static List<AlignedAssemblyOrExcuse> gatherEvidenceAndWriteContigSamFile(
+    public static Tuple2<List<AlignedAssemblyOrExcuse>, List<EvidenceTargetLink>> gatherEvidenceAndWriteContigSamFile(
             final JavaSparkContext ctx,
             final FindBreakpointEvidenceSparkArgumentCollection params,
             final SAMFileHeader header,
@@ -102,12 +103,12 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         final SVReadFilter filter = new SVReadFilter(params);
 
         // develop evidence, intervals, and, finally, a set of template names for each interval
-        final Tuple2<List<SVInterval>, HopscotchUniqueMultiMap<String, Integer, QNameAndInterval>> intervalsAndQNameMap =
-                getMappedQNamesSet(params, ctx, header, unfilteredReads, filter, toolLogger);
-        final List<SVInterval> intervals = intervalsAndQNameMap._1;
-        if ( intervals.isEmpty() ) return new ArrayList<>();
+        final Tuple3<List<SVInterval>, List<EvidenceTargetLink>, HopscotchUniqueMultiMap<String, Integer, QNameAndInterval>>
+                intervalsAndQNameMap = getMappedQNamesSet(params, ctx, header, unfilteredReads, filter, toolLogger);
+        final List<SVInterval> intervals = intervalsAndQNameMap._1();
+        if ( intervals.isEmpty() ) return new Tuple2<>(new ArrayList<>(), intervalsAndQNameMap._2());
 
-        final HopscotchUniqueMultiMap<String, Integer, QNameAndInterval> qNamesMultiMap = intervalsAndQNameMap._2;
+        final HopscotchUniqueMultiMap<String, Integer, QNameAndInterval> qNamesMultiMap = intervalsAndQNameMap._3();
 
         // supplement the template names with other reads that share kmers
         final List<AlignedAssemblyOrExcuse> alignedAssemblyOrExcuseList;
@@ -141,7 +142,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                 params.assembliesSortOrder == SAMFileHeader.SortOrder.queryname);
         log("Wrote SAM file of aligned contigs.", toolLogger);
 
-        return alignedAssemblyOrExcuseList;
+        return new Tuple2<>(alignedAssemblyOrExcuseList, intervalsAndQNameMap._2());
     }
 
     /**
@@ -152,7 +153,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
      * clean up by removing some intervals that are bogus as evidenced by ubiquitous kmers,
      * and return a set of template names and the intervals to which they belong.
      */
-    private static Tuple2<List<SVInterval>, HopscotchUniqueMultiMap<String, Integer, QNameAndInterval>> getMappedQNamesSet(
+    private static Tuple3<List<SVInterval>, List<EvidenceTargetLink>, HopscotchUniqueMultiMap<String, Integer, QNameAndInterval>> getMappedQNamesSet(
             final FindBreakpointEvidenceSparkArgumentCollection params,
             final JavaSparkContext ctx,
             final SAMFileHeader header,
@@ -172,12 +173,14 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         log("Metadata retrieved.", logger);
 
         final Broadcast<ReadMetadata> broadcastMetadata = ctx.broadcast(readMetadata);
-        List<SVInterval> intervals = getIntervals(params, broadcastMetadata, header, unfilteredReads, filter);
+        final Tuple2<List<SVInterval>, List<EvidenceTargetLink>> intervalsAndEvidenceTargetLinks =
+                getIntervalsAndEvidenceTargetLinks(params, broadcastMetadata, header, unfilteredReads, filter);
+        List<SVInterval> intervals = intervalsAndEvidenceTargetLinks._1();
 
         final int nIntervals = intervals.size();
         log("Discovered " + nIntervals + " intervals.", logger);
 
-        if ( nIntervals == 0 ) return new Tuple2<>(intervals, null);
+        if ( nIntervals == 0 ) return new Tuple3<>(intervals, intervalsAndEvidenceTargetLinks._2(), null);
 
         if ( params.exclusionIntervalsFile != null ) {
             intervals = removeIntervalsNearGapsAndLog(intervals, params.exclusionIntervalPadding, readMetadata,
@@ -195,7 +198,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         }
         log("Discovered " + qNamesMultiMap.size() + " mapped template names.", logger);
 
-        return new Tuple2<>(intervals, qNamesMultiMap);
+        return new Tuple3<>(intervals, intervalsAndEvidenceTargetLinks._2(), qNamesMultiMap);
     }
 
     /** Read a file of contig names that will be ignored when checking for inter-contig pairs. */
@@ -603,7 +606,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
      * Identify funky reads that support a hypothesis of a breakpoint in the vicinity, group the reads,
      * and declare a breakpoint interval where there is sufficient density of evidence.
      */
-    @VisibleForTesting static List<SVInterval> getIntervals(
+    @VisibleForTesting static Tuple2<List<SVInterval>, List<EvidenceTargetLink>> getIntervalsAndEvidenceTargetLinks(
             final FindBreakpointEvidenceSparkArgumentCollection params,
             final Broadcast<ReadMetadata> broadcastMetadata,
             final SAMFileHeader header,
@@ -635,13 +638,11 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                     return clusterer.cluster(itr);
                 }).filter(link -> link.readPairs >= 2 || link.splitReads >= 1);
 
-        final List<EvidenceTargetLink> evidenceTargetLinks = evidenceTargetLinkJavaRDD.collect();
+        final List<EvidenceTargetLink> evidenceTargetLinks = EvidenceTargetLinkClusterer.deduplicateTargetLinks(evidenceTargetLinkJavaRDD.collect());
 
-        final List<EvidenceTargetLink> targetLinkSourceTree = EvidenceTargetLinkClusterer.deduplicateTargetLinks(evidenceTargetLinks);
+        log("Collected " + evidenceTargetLinks.size() + " evidence target links", logger);
 
-        log("Collected " + targetLinkSourceTree.size() + " evidence target links", logger);
-
-        writeTargetLinks(params, broadcastMetadata, targetLinkSourceTree);
+        writeTargetLinks(params, broadcastMetadata, evidenceTargetLinks);
 
         final JavaRDD<BreakpointEvidence> filteredEvidenceRDD =
                 evidenceRDD
@@ -723,7 +724,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
             intervals.add(evidenceIterator2.next().getLocation());
         }
 
-        return intervals;
+        return new Tuple2(intervals, evidenceTargetLinks);
     }
 
     private static void writeTargetLinks(final FindBreakpointEvidenceSparkArgumentCollection params, final Broadcast<ReadMetadata> broadcastMetadata, final List<EvidenceTargetLink> targetLinks) {

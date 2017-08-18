@@ -11,7 +11,6 @@ import org.broadinstitute.hellbender.tools.spark.sv.utils.*;
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchSet;
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchUniqueMultiMap;
 import org.broadinstitute.hellbender.utils.IntHistogramTest;
-import org.broadinstitute.hellbender.utils.read.ArtificialReadUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
@@ -54,7 +53,7 @@ public final class FindBreakpointEvidenceSparkUnitTest extends BaseTest {
     @Test(groups = "spark")
     public void getIntervalsTest() {
         final List<SVInterval> actualIntervals =
-                FindBreakpointEvidenceSpark.getIntervals(params,broadcastMetadata,header,reads,filter);
+                FindBreakpointEvidenceSpark.getIntervalsAndEvidenceTargetLinks(params,broadcastMetadata,header,reads,filter)._1();
         Assert.assertEquals(actualIntervals, expectedIntervalList);
     }
 

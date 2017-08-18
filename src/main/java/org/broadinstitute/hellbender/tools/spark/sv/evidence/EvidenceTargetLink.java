@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @DefaultSerializer(EvidenceTargetLink.Serializer.class)
-class EvidenceTargetLink {
+public class EvidenceTargetLink {
     private static final SVInterval.Serializer intervalSerializer = new SVInterval.Serializer();
 
     final SVInterval source;
