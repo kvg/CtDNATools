@@ -1,7 +1,7 @@
 package org.broadinstitute.hellbender.tools.spark.sv.discovery.prototype;
 
-import avro.shaded.com.google.common.annotations.VisibleForTesting;
 import com.google.cloud.genomics.dataflow.utils.GCSOptions;
+import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.Cigar;
 import htsjdk.samtools.CigarElement;
 import htsjdk.samtools.CigarOperator;
@@ -52,11 +52,10 @@ final class ForSimpleStrandSwitch implements VariantDetectorFromLongReadAlignmen
         SVVCFWriter.writeVCF(options, vcfOutputFileName.replace(".vcf", "_simpleSS.vcf"),
                 fastaReference, simpleStrandSwitchBkpts, toolLogger);
 
-//        final JavaRDD<VariantContext> invDups =
-//                dealWithSuspectedInvDup(split._1, broadcastReference, toolLogger);
-//        if (invDups != null)
-//            SVVCFWriter.writeVCF(options, vcfOutputFileName.replace(".vcf", "_invDup.vcf"),
-//                    fastaReference, invDups, toolLogger);
+        final JavaRDD<VariantContext> invDups =
+                dealWithSuspectedInvDup(split._1, broadcastReference, toolLogger);
+        SVVCFWriter.writeVCF(options, vcfOutputFileName.replace(".vcf", "_invDup.vcf"),
+                fastaReference, invDups, toolLogger);
     }
 
     public static final class IsLikelyInvertedDuplication implements SerializablePredicate<AlignedContig> {
@@ -304,30 +303,38 @@ final class ForSimpleStrandSwitch implements VariantDetectorFromLongReadAlignmen
 
     // =================================================================================================================
 
-//    private JavaRDD<VariantContext> dealWithSuspectedInvDup(final JavaRDD<AlignedContig> longReads,
-//                                                            final Broadcast<ReferenceMultiSource> broadcastReference,
-//                                                            final Logger toolLogger) {
-//
-//        final JavaPairRDD<ChimericAlignment, byte[]> invDupSuspects =
-//                longReads
-//                        .mapToPair(ForSimpleStrandSwitch::convertAlignmentIntervalToChimericAlignment)
-//                        .filter(Objects::nonNull).cache();
-//
-//        toolLogger.info(invDupSuspects.count() + " chimera indicating inverted duplication");
-//
-//        return invDupSuspects
-//                .mapToPair(pair -> new Tuple2<>(new NovelAdjacencyReferenceLocations(pair._1, pair._2), pair._1))
-//                .groupByKey()
-//                .mapToPair(noveltyAndEvidence -> inferInvDupRange(noveltyAndEvidence, broadcastReference.getValue()))
-//                .map(noveltyTypeAndEvidence ->
-//                        DiscoverVariantsFromContigAlignmentsSAMSpark
-//                                .annotateVariant(noveltyTypeAndEvidence._1, noveltyTypeAndEvidence._2._1,
-//                                                 noveltyTypeAndEvidence._2._2, broadcastReference));
-//    }
-//
-//    private static Tuple2<NovelAdjacencyReferenceLocations, Tuple2<SvType, Iterable<ChimericAlignment>>>
-//    inferInvDupRange(final Tuple2<NovelAdjacencyReferenceLocations, Iterable<ChimericAlignment>> noveltyAndEvidence,
-//                     final ReferenceMultiSource reference) {
-//        return null;
-//    }
+    private JavaRDD<VariantContext> dealWithSuspectedInvDup(final JavaRDD<AlignedContig> longReads,
+                                                            final Broadcast<ReferenceMultiSource> broadcastReference,
+                                                            final Logger toolLogger) {
+
+        final JavaPairRDD<ChimericAlignment, byte[]> invDupSuspects =
+                longReads
+                        .mapToPair(ForSimpleStrandSwitch::convertAlignmentIntervalToChimericAlignment)
+                        .filter(Objects::nonNull).cache();
+
+        toolLogger.info(invDupSuspects.count() + " chimera indicating inverted duplication");
+
+        return invDupSuspects
+                .mapToPair(pair -> new Tuple2<>(new NovelAdjacencyReferenceLocations(pair._1, pair._2), new Tuple2<>(pair._1, pair._2)))
+                .groupByKey()
+                .flatMapToPair(ForSimpleStrandSwitch::inferInvDupRange)
+                .map(noveltyTypeAndAltSeqAndEvidence ->
+                        DiscoverVariantsFromContigAlignmentsSAMSpark
+                                .annotateVariant(noveltyTypeAndAltSeqAndEvidence._1._1(), noveltyTypeAndAltSeqAndEvidence._1._2(),
+                                        noveltyTypeAndAltSeqAndEvidence._1._3(), noveltyTypeAndAltSeqAndEvidence._2, broadcastReference));
+    }
+
+    private static Iterator<Tuple2<Tuple3<NovelAdjacencyReferenceLocations, SvType.DuplicationInverted, byte[]>, List<ChimericAlignment>>>
+    inferInvDupRange(final Tuple2<NovelAdjacencyReferenceLocations, Iterable<Tuple2<ChimericAlignment, byte[]>>> noveltyAndEvidence) {
+
+        final NovelAdjacencyReferenceLocations novelAdjacency = noveltyAndEvidence._1;
+        final SvType.DuplicationInverted duplicationInverted = new SvType.DuplicationInverted(novelAdjacency);
+
+        final Map<byte[], List<ChimericAlignment>> collect = Utils.stream(noveltyAndEvidence._2)
+                .collect(Collectors.groupingBy(caAndSeq -> novelAdjacency.complication.extractAltHaplotypeForInvDup(caAndSeq._1, caAndSeq._2),
+                        Collectors.mapping(caAndSeq -> caAndSeq._1, Collectors.toList())));
+
+        return collect.entrySet().stream().map(entry -> new Tuple2<>(new Tuple3<>(novelAdjacency, duplicationInverted, entry.getKey()),
+                entry.getValue())).iterator();
+    }
 }

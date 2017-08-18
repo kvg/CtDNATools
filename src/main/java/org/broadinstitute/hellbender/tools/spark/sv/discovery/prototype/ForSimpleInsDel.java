@@ -38,7 +38,7 @@ final class ForSimpleInsDel implements VariantDetectorFromLongReadAlignments {
                         .groupByKey()
                         .mapToPair(noveltyAndEvidence -> DiscoverVariantsFromContigAlignmentsSAMSpark.inferType(noveltyAndEvidence._1, noveltyAndEvidence._2))
                         .map(noveltyTypeAndEvidence -> DiscoverVariantsFromContigAlignmentsSAMSpark.annotateVariant(noveltyTypeAndEvidence._1,
-                                noveltyTypeAndEvidence._2._1, noveltyTypeAndEvidence._2._2, broadcastReference));
+                                noveltyTypeAndEvidence._2._1, null, noveltyTypeAndEvidence._2._2, broadcastReference));
 
         SVVCFWriter.writeVCF(options, vcfOutputFileName, fastaReference, annotatedVariants, toolLogger);
     }

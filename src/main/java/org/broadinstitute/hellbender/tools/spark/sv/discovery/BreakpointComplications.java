@@ -11,11 +11,16 @@ import htsjdk.samtools.CigarOperator;
 import htsjdk.samtools.TextCigarCodec;
 import htsjdk.samtools.util.SequenceUtil;
 import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SvCigarUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.read.CigarUtils;
 import scala.Tuple2;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A helper struct for annotating complications that make the locations represented by its associated
@@ -30,6 +35,10 @@ public final class BreakpointComplications {
     @SuppressWarnings("unchecked")
     private static final List<String> DEFAULT_CIGAR_STRINGS_FOR_DUP_SEQ_ON_CTG = new ArrayList<>(Collections.EMPTY_LIST);
 
+    private static final List<AlignmentStrand> DEFAULT_INV_DUP_REF_STRAND = Collections.singletonList(AlignmentStrand.FORWARD);
+    private static final List<AlignmentStrand> DEFAULT_INV_DUP_CTG_STRANDs_FR = Arrays.asList(AlignmentStrand.FORWARD, AlignmentStrand.REVERSE);
+    private static final List<AlignmentStrand> DEFAULT_INV_DUP_CTG_STRANDs_RF = Arrays.asList(AlignmentStrand.REVERSE, AlignmentStrand.FORWARD);
+
     /**
      * '+' strand representations of micro-homology, inserted sequence and duplicated sequence on the reference.
      */
@@ -41,8 +50,12 @@ public final class BreakpointComplications {
     private SimpleInterval dupSeqRepeatUnitRefSpan = null;
     private int dupSeqRepeatNumOnRef = 0;
     private int dupSeqRepeatNumOnCtg = 0;
+    private List<AlignmentStrand> dupSeqStrandOnRef = null;
+    private List<AlignmentStrand> dupSeqStrandOnCtg = null;
     private List<String> cigarStringsForDupSeqOnCtg = null;
     private boolean dupAnnotIsFromOptimization = false;
+
+    private SimpleInterval invertedTransInsertionRefSpan = null;
 
     /**
      * @return Intended for use in debugging and exception message only.
@@ -52,11 +65,26 @@ public final class BreakpointComplications {
         String toPrint = "homology: " + homologyForwardStrandRep + "\tinserted sequence: " + insertedSequenceForwardStrandRep;
 
         if (hasDuplicationAnnotation()) {
-            toPrint += String.format("\ttandem duplication repeat unit ref span: %s\tref repeat num: %d\tctg repeat num: %d\tcigarStringsForDupSeqOnCtg: %s\ttandupAnnotationIsFromSimpleOptimization: %s",
-                    dupSeqRepeatUnitRefSpan, dupSeqRepeatNumOnRef, dupSeqRepeatNumOnCtg, cigarStringsForDupSeqOnCtg, isDupAnnotIsFromOptimization() ? "true" : "false");
+            toPrint += String.format("\ttandem duplication repeat unit ref span: %s\t"+
+                            "ref repeat num: %d\t"+
+                            "ctg repeat num: %d\t"+
+                            "dupSeqStrandOnRef: %s\t" +
+                            "dupSeqStrandOnCtg: %s\t" +
+                            "cigarStringsForDupSeqOnCtg: %s\t"+
+                            "tandupAnnotationIsFromSimpleOptimization: %s\t" +
+                            "invertedTransInsertionRefSpan: %s",
+                    dupSeqRepeatUnitRefSpan == null ? "" : dupSeqRepeatUnitRefSpan,
+                    dupSeqRepeatNumOnRef, dupSeqRepeatNumOnCtg,
+                    dupSeqStrandOnRef == null ? "" : dupSeqStrandOnRef.stream().map(AlignmentStrand::toString).collect(SVUtils.arrayListCollector(dupSeqStrandOnRef.size())).toString(),
+                    dupSeqStrandOnCtg == null ? "" : dupSeqStrandOnCtg.stream().map(AlignmentStrand::toString).collect(SVUtils.arrayListCollector(dupSeqStrandOnCtg.size())).toString(),
+                    cigarStringsForDupSeqOnCtg == null ? "" : cigarStringsForDupSeqOnCtg,
+                    isDupAnnotIsFromOptimization() ? "true" : "false",
+                    invertedTransInsertionRefSpan == null ? "" : invertedTransInsertionRefSpan);
         }
         return toPrint;
     }
+
+    // all these getters may return null, check before accessing.
 
     boolean hasDuplicationAnnotation() {
         return hasDuplicationAnnotation;
@@ -66,7 +94,7 @@ public final class BreakpointComplications {
         return homologyForwardStrandRep;
     }
 
-    String getInsertedSequenceForwardStrandRep() {
+    public String getInsertedSequenceForwardStrandRep() {
         return insertedSequenceForwardStrandRep;
     }
 
@@ -82,12 +110,28 @@ public final class BreakpointComplications {
         return dupSeqRepeatNumOnCtg;
     }
 
+    List<AlignmentStrand> getDupSeqStrandOnRef() {
+        return dupSeqStrandOnRef;
+    }
+
+    List<AlignmentStrand> getDupSeqStrandOnCtg() {
+        return dupSeqStrandOnCtg;
+    }
+
     List<String> getCigarStringsForDupSeqOnCtg() {
         return cigarStringsForDupSeqOnCtg;
     }
 
     boolean isDupAnnotIsFromOptimization() {
         return dupAnnotIsFromOptimization;
+    }
+
+    SimpleInterval getInvertedTransInsertionRefSpan() {
+        return invertedTransInsertionRefSpan;
+    }
+
+    boolean hasDupSeqButNoStrandSwitch() {
+        return hasDuplicationAnnotation && dupSeqStrandOnCtg.stream().noneMatch(s -> s.equals(AlignmentStrand.REVERSE));
     }
 
     @VisibleForTesting
@@ -100,54 +144,153 @@ public final class BreakpointComplications {
     BreakpointComplications(final String homologyForwardStrandRep, final String insertedSequenceForwardStrandRep,
                             final boolean hasDuplicationAnnotation, final SimpleInterval dupSeqRepeatUnitRefSpan,
                             final int dupSeqRepeatNumOnRef, final int dupSeqRepeatNumOnCtg,
-                            final List<String> cigarStringsForDupSeqOnCtg, final boolean dupAnnotIsFromOptimization) {
+                            final List<AlignmentStrand> dupSeqStrandOnRef, final List<AlignmentStrand> dupSeqStrandOnCtg,
+                            final List<String> cigarStringsForDupSeqOnCtg, final boolean dupAnnotIsFromOptimization,
+                            final SimpleInterval invertedTransInsertionRefSpan) {
         this.homologyForwardStrandRep = homologyForwardStrandRep;
         this.insertedSequenceForwardStrandRep = insertedSequenceForwardStrandRep;
         this.hasDuplicationAnnotation = hasDuplicationAnnotation;
         this.dupSeqRepeatUnitRefSpan = dupSeqRepeatUnitRefSpan;
         this.dupSeqRepeatNumOnRef = dupSeqRepeatNumOnRef;
         this.dupSeqRepeatNumOnCtg = dupSeqRepeatNumOnCtg;
+        this.dupSeqStrandOnRef = dupSeqStrandOnRef;
+        this.dupSeqStrandOnCtg = dupSeqStrandOnCtg;
         this.cigarStringsForDupSeqOnCtg = cigarStringsForDupSeqOnCtg;
         this.dupAnnotIsFromOptimization = dupAnnotIsFromOptimization;
+        this.invertedTransInsertionRefSpan = invertedTransInsertionRefSpan;
     }
+
+    //==================================================================================================================
 
     /**
      * Given an {@link ChimericAlignment} representing two reference intervals rearranged as two intervals on the locally-assembled contig,
      * identify potential complications such as homology and duplication on the reference and/or on the contig.
      */
     BreakpointComplications(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
-        final Tuple2<SimpleInterval, SimpleInterval> referenceSpans = chimericAlignment.getCoordSortedReferenceSpans();
-        final SimpleInterval leftReferenceSpan  = referenceSpans._1;
-        final SimpleInterval rightReferenceSpan = referenceSpans._2;
+
+        // TODO: 12/5/16 simple translocation, don't tackle yet
+        // a segment with lower coordinate on the locally-assembled contig could map to a higher reference coordinate region
+        // under two basic types of SV's: inversion (strand switch necessary) and translocation (no strand switch necessary)
+        final boolean isNotSimpleTranslocation = chimericAlignment.isNotSimpleTranslocation();
+
+        if (chimericAlignment.strandSwitch!= StrandSwitch.NO_SWITCH) {
+            if (isLikelyInvertedDuplication(chimericAlignment.regionWithLowerCoordOnContig, chimericAlignment.regionWithHigherCoordOnContig))
+                initForInvDup(chimericAlignment, contigSeq);
+            else
+                initForInversion(chimericAlignment, contigSeq);
+        } else if (isNotSimpleTranslocation) {
+            initForInsDel(chimericAlignment, contigSeq);
+        }
+    }
+
+    //==================================================================================================================
+
+    private void initForInversion(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
 
         final AlignmentInterval firstAlignmentInterval  = chimericAlignment.regionWithLowerCoordOnContig;
         final AlignmentInterval secondAlignmentInterval = chimericAlignment.regionWithHigherCoordOnContig;
 
-        // a segment with lower coordinate on the locally-assembled contig could map to a higher reference coordinate region
-        // under two basic types of SV's: inversion (strand switch necessary) and translocation (no strand switch necessary)
-        final boolean isNotSimpleTranslocation =
-                ChimericAlignment.isNotSimpleTranslocation(chimericAlignment.regionWithLowerCoordOnContig,
-                        chimericAlignment.regionWithHigherCoordOnContig, chimericAlignment.strandSwitch,
-                        ChimericAlignment.involvesRefPositionSwitch(firstAlignmentInterval, secondAlignmentInterval));
-
-        // TODO: 12/5/16 simple translocation, don't tackle yet
-        if (chimericAlignment.strandSwitch!= StrandSwitch.NO_SWITCH) { // the case involves an inversion
-            // TODO: 12/5/16 duplication detection to be done for inversion alleles
-            initForSimpleInversion(firstAlignmentInterval, secondAlignmentInterval, contigSeq);
-        } else if (isNotSimpleTranslocation) {
-            initForInsDel(chimericAlignment, leftReferenceSpan, rightReferenceSpan, contigSeq);
-        }
-    }
-
-    private void initForSimpleInversion(final AlignmentInterval firstContigRegion, final AlignmentInterval secondContigRegion,
-                                        final byte[] contigSeq) {
-        homologyForwardStrandRep = getHomology(firstContigRegion, secondContigRegion, contigSeq);
-        insertedSequenceForwardStrandRep = getInsertedSequence(firstContigRegion, secondContigRegion, contigSeq);
+        homologyForwardStrandRep = getHomology(firstAlignmentInterval, secondAlignmentInterval, contigSeq);
+        insertedSequenceForwardStrandRep = getInsertedSequence(firstAlignmentInterval, secondAlignmentInterval, contigSeq);
         dupSeqRepeatUnitRefSpan = null;
         dupSeqRepeatNumOnRef = dupSeqRepeatNumOnCtg = 0;
+        dupSeqStrandOnRef = dupSeqStrandOnCtg = null;
         cigarStringsForDupSeqOnCtg = null;
         dupAnnotIsFromOptimization = false;
         hasDuplicationAnnotation = false;
+    }
+
+    private void initForInvDup(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
+
+        final AlignmentInterval firstAlignmentInterval  = chimericAlignment.regionWithLowerCoordOnContig;
+        final AlignmentInterval secondAlignmentInterval = chimericAlignment.regionWithHigherCoordOnContig;
+
+        // TODO: 8/8/17 this might be wrong regarding how strand is involved, fix it
+        insertedSequenceForwardStrandRep = getInsertedSequence(firstAlignmentInterval, secondAlignmentInterval, contigSeq);
+        hasDuplicationAnnotation = true;
+
+        dupSeqRepeatNumOnRef = 1;
+        dupSeqRepeatNumOnCtg = 2;
+        dupSeqStrandOnRef = DEFAULT_INV_DUP_REF_STRAND;
+
+        // jump start and jump landing locations
+        final int js = firstAlignmentInterval.forwardStrand ? firstAlignmentInterval.referenceSpan.getEnd()
+                                                            : firstAlignmentInterval.referenceSpan.getStart();
+        final int jl = secondAlignmentInterval.forwardStrand ? secondAlignmentInterval.referenceSpan.getStart()
+                                                             : secondAlignmentInterval.referenceSpan.getEnd();
+
+
+
+        if (firstAlignmentInterval.forwardStrand) {
+            final int alpha = firstAlignmentInterval.referenceSpan.getStart(),
+                      omega = secondAlignmentInterval.referenceSpan.getStart();
+            dupSeqRepeatUnitRefSpan = new SimpleInterval(firstAlignmentInterval.referenceSpan.getContig(),
+                                                         Math.max(alpha, omega), Math.min(js, jl));
+            if ( (alpha <= omega && js < jl) || (alpha > omega && jl < js) ) {
+                invertedTransInsertionRefSpan = new SimpleInterval(firstAlignmentInterval.referenceSpan.getContig(),
+                                                                   Math.min(js, jl) + 1, Math.max(js, jl));
+            }
+            dupSeqStrandOnCtg = DEFAULT_INV_DUP_CTG_STRANDs_FR;
+        } else {
+            final int alpha = firstAlignmentInterval.referenceSpan.getEnd(),
+                      omega = secondAlignmentInterval.referenceSpan.getEnd();
+            dupSeqRepeatUnitRefSpan = new SimpleInterval(firstAlignmentInterval.referenceSpan.getContig(),
+                                                         Math.max(js, jl), Math.min(alpha, omega));
+            if ( (alpha >= omega && jl < js) || (alpha < omega && js < jl) ) {
+                invertedTransInsertionRefSpan = new SimpleInterval(firstAlignmentInterval.referenceSpan.getContig(),
+                                                                   Math.min(js, jl) + 1, Math.max(js, jl));
+            }
+            dupSeqStrandOnCtg = DEFAULT_INV_DUP_CTG_STRANDs_RF;
+        }
+        cigarStringsForDupSeqOnCtg = DEFAULT_CIGAR_STRINGS_FOR_DUP_SEQ_ON_CTG; // not computing cigars because alt haplotypes will be extracted
+
+        dupAnnotIsFromOptimization = false;
+    }
+
+    public byte[] extractAltHaplotypeForInvDup(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
+
+        final AlignmentInterval firstAlignmentInterval  = chimericAlignment.regionWithLowerCoordOnContig;
+        final AlignmentInterval secondAlignmentInterval = chimericAlignment.regionWithHigherCoordOnContig;
+
+        final int start, end; // intended to be 0-based, semi-open [start, end)
+        final boolean needRC;
+        if (firstAlignmentInterval.forwardStrand) {
+            final int alpha = firstAlignmentInterval.referenceSpan.getStart(),
+                      omega = secondAlignmentInterval.referenceSpan.getStart();
+            if (alpha <= omega) {
+                final int walkOnRead = SvCigarUtils.computeAssociatedDistOnRead(firstAlignmentInterval.cigarAlong5to3DirectionOfContig,
+                        firstAlignmentInterval.startInAssembledContig, omega - alpha, false);
+                start  = firstAlignmentInterval.startInAssembledContig + walkOnRead - 1;
+                end    = secondAlignmentInterval.endInAssembledContig;
+                needRC = false;
+            } else {
+                final int walkOnRead = SvCigarUtils.computeAssociatedDistOnRead(secondAlignmentInterval.cigarAlong5to3DirectionOfContig,
+                        secondAlignmentInterval.endInAssembledContig, alpha - omega, true);
+                start  = firstAlignmentInterval.startInAssembledContig - 1;
+                end    = secondAlignmentInterval.endInAssembledContig - walkOnRead;
+                needRC = true;
+            }
+        } else {
+            final int alpha = firstAlignmentInterval.referenceSpan.getEnd(),
+                      omega = secondAlignmentInterval.referenceSpan.getEnd();
+            if (alpha >= omega) {
+                final int walkOnRead = SvCigarUtils.computeAssociatedDistOnRead(firstAlignmentInterval.cigarAlong5to3DirectionOfContig,
+                        firstAlignmentInterval.startInAssembledContig, alpha - omega, false);
+                start  = firstAlignmentInterval.startInAssembledContig + walkOnRead - 1;
+                end    = secondAlignmentInterval.endInAssembledContig;
+                needRC = true;
+            } else {
+                final int walkOnRead = SvCigarUtils.computeAssociatedDistOnRead(secondAlignmentInterval.cigarAlong5to3DirectionOfContig,
+                        secondAlignmentInterval.endInAssembledContig, omega - alpha, true);
+                start  = firstAlignmentInterval.startInAssembledContig - 1;
+                end    = secondAlignmentInterval.endInAssembledContig - walkOnRead;
+                needRC = false;
+            }
+        }
+
+        final byte[] seq = Arrays.copyOfRange(contigSeq, start, end);
+        if (needRC) SequenceUtil.reverseComplement(seq, 0, seq.length);
+        return seq;
     }
 
     /**
@@ -156,32 +299,36 @@ public final class BreakpointComplications {
     @VisibleForTesting
     public static boolean isLikelyInvertedDuplication(final AlignmentInterval one, final AlignmentInterval two) {
         return 2 * AlignmentInterval.overlapOnRefSpan(one, two) >
-                Math.min(one.endInAssembledContig - one.startInAssembledContig,
-                        two.endInAssembledContig - two.startInAssembledContig) + 1;
+        Math.min(one.endInAssembledContig - one.startInAssembledContig,
+                 two.endInAssembledContig - two.startInAssembledContig) + 1;
     }
 
-    private void initForInsDel(final ChimericAlignment chimericAlignment, final SimpleInterval leftReferenceInterval,
-                               final SimpleInterval rightReferenceInterval, final byte[] contigSeq) {
+    //==================================================================================================================
+
+    private void initForInsDel(final ChimericAlignment chimericAlignment, final byte[] contigSeq) {
 
         final AlignmentInterval firstContigRegion  = chimericAlignment.regionWithLowerCoordOnContig;
         final AlignmentInterval secondContigRegion = chimericAlignment.regionWithHigherCoordOnContig;
+        final Tuple2<SimpleInterval, SimpleInterval> referenceSpans = chimericAlignment.getCoordSortedReferenceSpans();
+        final SimpleInterval leftReferenceSpan  = referenceSpans._1;
+        final SimpleInterval rightReferenceSpan = referenceSpans._2;
 
-        final int r1e = leftReferenceInterval.getEnd(),
-                r2b = rightReferenceInterval.getStart(),
-                c1e = firstContigRegion.endInAssembledContig,
-                c2b = secondContigRegion.startInAssembledContig;
+        final int r1e = leftReferenceSpan.getEnd(),
+                  r2b = rightReferenceSpan.getStart(),
+                  c1e = firstContigRegion.endInAssembledContig,
+                  c2b = secondContigRegion.startInAssembledContig;
 
         final int distBetweenAlignRegionsOnRef = r2b - r1e - 1, // distance-1 between the two regions on reference, denoted as d1 in the comments below
-                distBetweenAlignRegionsOnCtg = c2b - c1e - 1; // distance-1 between the two regions on contig, denoted as d2 in the comments below
+                  distBetweenAlignRegionsOnCtg = c2b - c1e - 1; // distance-1 between the two regions on contig, denoted as d2 in the comments below
 
         if ( distBetweenAlignRegionsOnRef > 0 ) {        // Deletion:
             resolveComplicationForSimpleDel(firstContigRegion, secondContigRegion, distBetweenAlignRegionsOnCtg, contigSeq);
         } else if (distBetweenAlignRegionsOnRef == 0 && distBetweenAlignRegionsOnCtg > 0) { // Insertion: simple insertion, inserted sequence is the sequence [c1e+1, c2b-1] on the contig
             insertedSequenceForwardStrandRep = getInsertedSequence(firstContigRegion, secondContigRegion, contigSeq);
         } else if (distBetweenAlignRegionsOnRef == 0 && distBetweenAlignRegionsOnCtg < 0) { // Tandem repeat contraction: reference has two copies but one copy was deleted on the contig; duplicated sequence on reference are [r1e-|d2|+1, r1e] and [r2b, r2b+|d2|-1]
-            resolveComplicationForSimpleTandupContraction(leftReferenceInterval, firstContigRegion, secondContigRegion, r1e, c1e, c2b, contigSeq);
+            resolveComplicationForSimpleTandupContraction(leftReferenceSpan, firstContigRegion, secondContigRegion, r1e, c1e, c2b, contigSeq);
         } else if (distBetweenAlignRegionsOnRef < 0 && distBetweenAlignRegionsOnCtg >= 0) { // Tandem repeat expansion:   reference bases [r1e-|d1|+1, r1e] to contig bases [c1e-|d1|+1, c1e] and [c2b, c2b+|d1|-1] with optional inserted sequence [c1e+1, c2b-1] in between the two intervals on contig
-            resolveComplicationForSimpleTandupExpansion(leftReferenceInterval, firstContigRegion, secondContigRegion, r1e, r2b, distBetweenAlignRegionsOnCtg, contigSeq);
+            resolveComplicationForSimpleTandupExpansion(leftReferenceSpan, firstContigRegion, secondContigRegion, r1e, r2b, distBetweenAlignRegionsOnCtg, contigSeq);
         } else if (distBetweenAlignRegionsOnRef < 0 && distBetweenAlignRegionsOnCtg < 0) {  // most complicated case, see below
             // Deletion:  duplication with repeat number N1 on reference, N2 on contig, such that N1 <= 2*N2 (and N2<N1);
             // Insertion: duplication with repeat number N1 on reference, N2 on contig, such that N2 <= 2*N1 (and N1<N2);
@@ -198,6 +345,8 @@ public final class BreakpointComplications {
         }
     }
 
+    //==================================================================================================================
+
     private void resolveComplicationForSimpleTandupExpansion(final SimpleInterval leftReferenceInterval,
                                                              final AlignmentInterval firstContigRegion,
                                                              final AlignmentInterval secondContigRegion,
@@ -209,6 +358,8 @@ public final class BreakpointComplications {
         dupSeqRepeatUnitRefSpan   = new SimpleInterval(leftReferenceInterval.getContig(), r2b, r1e);
         dupSeqRepeatNumOnRef      = 1;
         dupSeqRepeatNumOnCtg      = 2;
+        dupSeqStrandOnRef         = Arrays.asList(AlignmentStrand.FORWARD);
+        dupSeqStrandOnCtg         = Arrays.asList(AlignmentStrand.FORWARD, AlignmentStrand.FORWARD);
         cigarStringsForDupSeqOnCtg = new ArrayList<>(2);
         if (firstContigRegion.forwardStrand) {
             cigarStringsForDupSeqOnCtg.add( TextCigarCodec.encode(extractCigarForTandup(firstContigRegion, r1e, r2b)) );
@@ -229,6 +380,8 @@ public final class BreakpointComplications {
         dupSeqRepeatUnitRefSpan  = new SimpleInterval(leftReferenceInterval.getContig(), r1e - ( c1e - c2b ), r1e);
         dupSeqRepeatNumOnRef     = 2;
         dupSeqRepeatNumOnCtg     = 1;
+        dupSeqStrandOnRef         = Arrays.asList(AlignmentStrand.FORWARD, AlignmentStrand.FORWARD);
+        dupSeqStrandOnCtg         = Arrays.asList(AlignmentStrand.FORWARD);
         cigarStringsForDupSeqOnCtg = DEFAULT_CIGAR_STRINGS_FOR_DUP_SEQ_ON_CTG;
     }
 
@@ -267,6 +420,8 @@ public final class BreakpointComplications {
                                                     : duplicationComplication.higherRepeatNumberEstimate;
         dupSeqRepeatNumOnCtg          = isExpansion ? duplicationComplication.higherRepeatNumberEstimate
                                                     : duplicationComplication.lowerRepeatNumberEstimate;
+        dupSeqStrandOnRef             = new ArrayList<AlignmentStrand>(Collections.nCopies(dupSeqRepeatNumOnRef, AlignmentStrand.FORWARD));
+        dupSeqStrandOnCtg             = new ArrayList<AlignmentStrand>(Collections.nCopies(dupSeqRepeatNumOnCtg, AlignmentStrand.FORWARD));
         dupAnnotIsFromOptimization    = true;
     }
 
@@ -353,40 +508,8 @@ public final class BreakpointComplications {
         }
     }
 
-    // TODO: 03/03/17 this complicated tandem duplication annotation is not exactly reproducible in the following sense:
-    //          1) depending on what the assembler might produce, e.g. different runs producing slightly different sequences
-    //          hence affecting alignment,
-    //          2) the assembler might decide to output RC sequences between runs hence the mapping would be to '+' or '-' strand
-    //       these randomness may give slightly different results by this treatment
-    /**
-     * This auxiliary structure, when constructed given overlaps of two corresponding regions on reference and contig sequences,
-     * attempts to find--naively and slowly--the repeat numbers on the reference and on the contig of tandem repeats,
-     * as well as the pseudo-homology between the duplicated sequence and the right flanking region.
-     *
-     * An example might help:
-     * an assembled contig that's actually a repeat expansion from 1 repeat to 2 repeats with pseudo-homology:
-     * TGCCAGGTTACATGGCAAAGAGGGTAGATATGGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCATGAGGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCAGGAGGGCAGCTGTGGATGGTGCAAATGCCATTTATGCTCCTCTCCACCCATATCC
-     * can be aligned to chr18,
-     * the 1st alignment chr18:312579-718, 140M135S, which can be broken into the following part
-     * 31:  TGCCAGGTTACATGGCAAAGAGGGTAGATAT
-     * 109: GGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCATGAGGGGAGCTGTGAA
-     * 135: GAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCAGGAGGGCAGCTGTGGATGGTGCAAATGCCATTTATGCTCCTCTCCACCCATATCC
-     * And the arithmetic to get the cigar operation length works this way:
-     * 31 + 109 = 140
-     * 109 = 96 + 13
-     * where 31 is the left flanking region before the repeated unit, which itself is 96 bases long (see below),
-     * the number 13 is the length of the pseudo-homology between the starting bases of the repeated sequence and the right flanking region
-     * a clearer picture emerges when we look at the 2nd alignment
-     * chr18:312610-757, 127S148M, which can be broken into
-     * 31: TGCCAGGTTACATGGCAAAGAGGGTAGATAT
-     * 96: GGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCATGA
-     * 96: GGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCAGGA
-     * 13: GGGCAGCTGTGGA
-     * 39: TGGTGCAAATGCCATTTATGCTCCTCTCCACCCATATCC
-     * And the arithmetic works this way:
-     * 31 + 96 = 127
-     * 96 + 13 + 39 = 148
-     */
+    // TODO: 03/03/17 this complicated tandem duplication case is not exactly reproducible
+    //       (e.g. '+' and '-' strand may give slightly different results by this treatment)
     private static final class TandemRepeatStructure {
 
         /**
@@ -400,7 +523,34 @@ public final class BreakpointComplications {
         final int repeatedSeqLen;
         final int pseudoHomologyLen;
 
-
+        /**
+         * This function, when given overlaps of two corresponding regions on reference and contig sequences,
+         * attempts to find--naively and slowly--the repeat numbers on the reference and on the contig of tandem repeats,
+         * as well as the pseudo-homology between the duplicated sequence and the right flanking region.
+         *
+         * An example might help:
+         * an assembled contig that's actually a repeat expansion from 1 repeat to 2 repeats with pseudo-homology:
+         * TGCCAGGTTACATGGCAAAGAGGGTAGATATGGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCATGAGGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCAGGAGGGCAGCTGTGGATGGTGCAAATGCCATTTATGCTCCTCTCCACCCATATCC
+         * can be aligned to chr18:312XXX:
+         * the 1st alignment chr18:312579-718 140M135S, which can be broken into the following part
+         * 31:  TGCCAGGTTACATGGCAAAGAGGGTAGATAT
+         * 109: GGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCATGAGGGGAGCTGTGAA
+         * 135: GAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCAGGAGGGCAGCTGTGGATGGTGCAAATGCCATTTATGCTCCTCTCCACCCATATCC
+         * And the arithmetic works this way:
+         * 31 + 109 = 140
+         * 109 = 96 + 13
+         * where 31 is the left flanking region before the repeated unit, which itself is 96 bases long (see below),
+         * the number 13 is the length of the pseudo-homology between the starting bases of the repeated sequence and the right flanking region
+         * a clearer picture emerges when we look at the 2nd alignment chr18:312610-757 127S148M, which can be broken into
+         * 31: TGCCAGGTTACATGGCAAAGAGGGTAGATAT
+         * 96: GGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCATGA
+         * 96: GGGGAGCTGTGAAGAATGGAGCCAGTAATTAAATTCACTGAAGTCTCCACAGGAGGGCAAGGTGGACAATCTGTCCCATAGGAGGGGGATTCAGGA
+         * 13: GGGCAGCTGTGGA
+         * 39: TGGTGCAAATGCCATTTATGCTCCTCTCCACCCATATCC
+         * And the arithmetic works this way:
+         * 31 + 96 = 127
+         * 96 + 13 + 39 = 148
+         */
         @VisibleForTesting
         TandemRepeatStructure(final int distBetweenAlignRegionsOnRef, final int distBetweenAlignRegionsOnCtg) {
             // the reference system with a shorter overlap (i.e. with less-negative distance between regions) has a higher repeat number
@@ -448,6 +598,8 @@ public final class BreakpointComplications {
         }
     }
 
+    //==================================================================================================================
+
     protected BreakpointComplications(final Kryo kryo, final Input input) {
         homologyForwardStrandRep = input.readString();
         insertedSequenceForwardStrandRep = input.readString();
@@ -459,6 +611,14 @@ public final class BreakpointComplications {
             dupSeqRepeatUnitRefSpan = new SimpleInterval(ctg, start, end);
             dupSeqRepeatNumOnRef = input.readInt();
             dupSeqRepeatNumOnCtg = input.readInt();
+            dupSeqStrandOnRef = new ArrayList<>(dupSeqRepeatNumOnRef);
+            for (int i=0; i<dupSeqRepeatNumOnRef; ++i) {
+                dupSeqStrandOnRef.add(AlignmentStrand.values()[input.readInt()]);
+            }
+            dupSeqStrandOnCtg = new ArrayList<>(dupSeqRepeatNumOnCtg);
+            for (int i=0; i<dupSeqRepeatNumOnCtg; ++i) {
+                dupSeqStrandOnCtg.add(AlignmentStrand.values()[input.readInt()]);
+            }
             final int cigarCounts = input.readInt();
             cigarStringsForDupSeqOnCtg = new ArrayList<>(cigarCounts);
             for(int i = 0; i < cigarCounts; ++i) {
@@ -469,8 +629,17 @@ public final class BreakpointComplications {
             dupSeqRepeatUnitRefSpan = null;
             dupSeqRepeatNumOnRef = 0;
             dupSeqRepeatNumOnCtg = 0;
+            dupSeqStrandOnRef = null;
+            dupSeqStrandOnCtg = null;
             cigarStringsForDupSeqOnCtg = null;
             dupAnnotIsFromOptimization = false;
+        }
+
+        if (input.readBoolean()) {
+            final String chr = input.readString();
+            final int start = input.readInt();
+            final int end = input.readInt();
+            invertedTransInsertionRefSpan = new SimpleInterval(chr, start, end);
         }
     }
 
@@ -484,9 +653,17 @@ public final class BreakpointComplications {
             output.writeInt(dupSeqRepeatUnitRefSpan.getEnd());
             output.writeInt(dupSeqRepeatNumOnRef);
             output.writeInt(dupSeqRepeatNumOnCtg);
+            dupSeqStrandOnRef.forEach(s -> output.writeInt(s.ordinal()));
+            dupSeqStrandOnCtg.forEach(s -> output.writeInt(s.ordinal()));
             output.writeInt(cigarStringsForDupSeqOnCtg.size());
             cigarStringsForDupSeqOnCtg.forEach(output::writeString);
             output.writeBoolean(dupAnnotIsFromOptimization);
+        }
+        output.writeBoolean(invertedTransInsertionRefSpan != null);
+        if (invertedTransInsertionRefSpan != null) {
+            output.writeString(invertedTransInsertionRefSpan.getContig());
+            output.writeInt(invertedTransInsertionRefSpan.getStart());
+            output.writeInt(invertedTransInsertionRefSpan.getEnd());
         }
     }
 
@@ -505,8 +682,13 @@ public final class BreakpointComplications {
         if (!insertedSequenceForwardStrandRep.equals(that.insertedSequenceForwardStrandRep)) return false;
         if (dupSeqRepeatUnitRefSpan != null ? !dupSeqRepeatUnitRefSpan.equals(that.dupSeqRepeatUnitRefSpan) : that.dupSeqRepeatUnitRefSpan != null)
             return false;
-        return cigarStringsForDupSeqOnCtg != null ? cigarStringsForDupSeqOnCtg.equals(that.cigarStringsForDupSeqOnCtg)
-                : that.cigarStringsForDupSeqOnCtg == null;
+        if (dupSeqStrandOnRef != null ? !dupSeqStrandOnRef.equals(that.dupSeqStrandOnRef) : that.dupSeqStrandOnRef != null)
+            return false;
+        if (dupSeqStrandOnCtg != null ? !dupSeqStrandOnCtg.equals(that.dupSeqStrandOnCtg) : that.dupSeqStrandOnCtg != null)
+            return false;
+        if (cigarStringsForDupSeqOnCtg != null ? !cigarStringsForDupSeqOnCtg.equals(that.cigarStringsForDupSeqOnCtg) : that.cigarStringsForDupSeqOnCtg != null)
+            return false;
+        return invertedTransInsertionRefSpan != null ? invertedTransInsertionRefSpan.equals(that.invertedTransInsertionRefSpan) : that.invertedTransInsertionRefSpan == null;
     }
 
     @Override
@@ -517,8 +699,11 @@ public final class BreakpointComplications {
         result = 31 * result + (dupSeqRepeatUnitRefSpan != null ? dupSeqRepeatUnitRefSpan.hashCode() : 0);
         result = 31 * result + dupSeqRepeatNumOnRef;
         result = 31 * result + dupSeqRepeatNumOnCtg;
+        result = 31 * result + (dupSeqStrandOnRef != null ? dupSeqStrandOnRef.hashCode() : 0);
+        result = 31 * result + (dupSeqStrandOnCtg != null ? dupSeqStrandOnCtg.hashCode() : 0);
         result = 31 * result + (cigarStringsForDupSeqOnCtg != null ? cigarStringsForDupSeqOnCtg.hashCode() : 0);
         result = 31 * result + (dupAnnotIsFromOptimization ? 1 : 0);
+        result = 31 * result + (invertedTransInsertionRefSpan != null ? invertedTransInsertionRefSpan.hashCode() : 0);
         return result;
     }
 

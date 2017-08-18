@@ -4,7 +4,10 @@ import htsjdk.variant.vcf.*;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 // TODO: 7/24/17 the structure of this file is resembling that of {@link GATKVCFHeaderLines}, should we move this there?
 public class GATKSVVCFHeaderLines {
@@ -57,7 +60,8 @@ public class GATKSVVCFHeaderLines {
                 GATKSVVCFConstants.SYMB_ALT_ALLELE_INS_IN_HEADER, "Insertion of novel sequence relative to the reference"));
         addSymbAltAlleleLine(new VCFSimpleHeaderLine(GATKVCFConstants.SYMBOLIC_ALLELE_DEFINITION_HEADER_TAG,
                 GATKSVVCFConstants.SYMB_ALT_ALLELE_DUP_IN_HEADER, "Region of elevated copy number relative to the reference"));
-
+        addSymbAltAlleleLine(new VCFSimpleHeaderLine(GATKVCFConstants.SYMBOLIC_ALLELE_DEFINITION_HEADER_TAG,
+                GATKSVVCFConstants.SYMB_ALT_ALLELE_INVDUP_IN_HEADER, "Region of elevated copy number relative to the reference, with some copies inverted"));
 
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.SVTYPE, 1, VCFHeaderLineType.String, "Type of structural variant"));
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.SVLEN, VCFHeaderLineCount.UNBOUNDED, VCFHeaderLineType.Integer, "Difference in length between REF and ALT alleles"));
@@ -76,6 +80,9 @@ public class GATKSVVCFHeaderLines {
 
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.HOMOLOGY, VCFHeaderLineCount.UNBOUNDED, VCFHeaderLineType.String, "Homologous sequence from contig at the breakpoint"));
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.HOMOLOGY_LENGTH, 1, VCFHeaderLineType.Integer, "Length of homologous sequence"));
+
+        addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.ALT_HAPLOTYPE_SEQ, VCFHeaderLineCount.A, VCFHeaderLineType.Character, "Alt haplotype sequence, one per alt allele"));
+
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.INV33, 0, VCFHeaderLineType.Flag, "Whether the event represents a 3' to 5' inversion"));
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.INV55, 0, VCFHeaderLineType.Flag, "Whether the event represents a 5' to 3' inversion"));
 
@@ -84,6 +91,11 @@ public class GATKSVVCFHeaderLines {
                 "CIGARs of the repeated sequence on the locally-assembled contigs when aligned to " + GATKSVVCFConstants.DUP_REPEAT_UNIT_REF_SPAN + " (currently only available for repeats when " + GATKSVVCFConstants.DUP_ANNOTATIONS_IMPRECISE + " is false)"));
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.DUPLICATION_NUMBERS, VCFHeaderLineCount.R, VCFHeaderLineType.Integer, "Number of times the sequence is duplicated on reference and on the alternate alleles"));
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.DUP_ANNOTATIONS_IMPRECISE, 0, VCFHeaderLineType.Flag, "Whether the duplication annotations are from an experimental optimization procedure"));
+
+        addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.INVDUP_STRANDS, VCFHeaderLineCount.A, VCFHeaderLineType.String,
+                "Strands of the duplicated sequence on alt allele, one group for each alt allele (currently only available for inverted duplication variants)"));
+        addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.INV_TRANS_INS_REF_SPAN, VCFHeaderLineCount.UNBOUNDED, VCFHeaderLineType.String,
+                "Reference span of mapping location of trans-located and inverted inserted sequence possible in inverted duplications"));
 
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.TANDUP_CONTRACTION_STRING, 0, VCFHeaderLineType.Flag, "Tandem repeats contraction compared to reference"));
         addInfoLine(new VCFInfoHeaderLine(GATKSVVCFConstants.TANDUP_EXPANSION_STRING, 0, VCFHeaderLineType.Flag, "Tandem repeats expansion compared to reference"));

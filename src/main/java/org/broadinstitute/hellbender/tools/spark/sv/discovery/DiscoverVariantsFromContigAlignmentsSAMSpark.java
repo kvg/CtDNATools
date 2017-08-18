@@ -179,7 +179,7 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
                         .groupByKey()                                                                                                 // group the same novel adjacency produced by different contigs together
                         .mapToPair(noveltyAndEvidence -> inferType(noveltyAndEvidence._1, noveltyAndEvidence._2))                     // type inference based on novel adjacency and evidence alignments
                         .map(noveltyTypeAndEvidence -> annotateVariant(noveltyTypeAndEvidence._1,                                     // annotate the novel adjacency and inferred type
-                                noveltyTypeAndEvidence._2._1, noveltyTypeAndEvidence._2._2, broadcastReference));
+                                noveltyTypeAndEvidence._2._1, null, noveltyTypeAndEvidence._2._2, broadcastReference));
 
         SVVCFWriter.writeVCF(pipelineOptions, vcfFileName, fastaReference, annotatedVariants, toolLogger);
     }
@@ -212,13 +212,14 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
      */
     public static VariantContext annotateVariant(final NovelAdjacencyReferenceLocations novelAdjacency,
                                                  final SvType inferredType,
+                                                 final byte[] altHaplotypeSeq,
                                                  final Iterable<ChimericAlignment> chimericAlignments,
                                                  final Broadcast<ReferenceMultiSource> broadcastReference)
             throws IOException {
         return AnnotatedVariantProducer
                 .produceAnnotatedVcFromInferredTypeAndRefLocations(novelAdjacency.leftJustifiedLeftRefLoc,
                         novelAdjacency.leftJustifiedRightRefLoc.getStart(), novelAdjacency.complication,
-                        inferredType, chimericAlignments,
+                        inferredType, altHaplotypeSeq, chimericAlignments,
                         broadcastReference);
     }
 }
