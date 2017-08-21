@@ -10,6 +10,7 @@ import htsjdk.samtools.SAMReadGroupRecord;
 import htsjdk.samtools.SAMSequenceRecord;
 import org.apache.spark.api.java.JavaRDD;
 import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.tools.spark.utils.IntHistogram;
 import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
@@ -40,6 +41,7 @@ public class ReadMetadata {
     private final int coverage;
     private final PartitionBounds[] partitionBounds;
     private final Map<String, LibraryStatistics> libraryToFragmentStatistics;
+    private final SVReadFilter svReadFilter;
     private final static String NO_GROUP = "NoGroup";
 
     public ReadMetadata( final Set<Integer> crossContigIgnoreSet,
@@ -83,6 +85,7 @@ public class ReadMetadata {
         libraryToFragmentStatistics = new HashMap<>(SVUtils.hashMapCapacity(combinedMaps.size()));
         combinedMaps.forEach( (libName, rawStats) ->
                 libraryToFragmentStatistics.put(libName,rawStats.createLibraryStatistics(nRefBases)));
+        this.svReadFilter = filter;
     }
 
     /** This constructor is for testing only.  It applies a single LibraryStatistics object to all libraries. */
@@ -105,6 +108,7 @@ public class ReadMetadata {
         for ( final SAMReadGroupRecord readGroupRecord : header.getReadGroups() ) {
             libraryToFragmentStatistics.put(readGroupRecord.getLibrary(), stats);
         }
+        this.svReadFilter = new SVReadFilter(new StructuralVariationDiscoveryArgumentCollection.FindBreakpointEvidenceSparkArgumentCollection());
     }
 
     private ReadMetadata( final Kryo kryo, final Input input ) {
@@ -151,6 +155,9 @@ public class ReadMetadata {
             final LibraryStatistics stats = statsSerializer.read(kryo, input, LibraryStatistics.class);
             libraryToFragmentStatistics.put(libraryName, stats);
         }
+
+        final SVReadFilter.Serializer serializer = new SVReadFilter.Serializer();
+        svReadFilter = serializer.read(kryo, input, SVReadFilter.class);
     }
 
     private void serialize( final Kryo kryo, final Output output ) {
@@ -188,6 +195,9 @@ public class ReadMetadata {
             output.writeString(entry.getKey());
             statsSerializer.write(kryo, output, entry.getValue());
         }
+
+        final SVReadFilter.Serializer serializer = new SVReadFilter.Serializer();
+        serializer.write(kryo, output, svReadFilter);
     }
 
     public boolean ignoreCrossContigID( final int contigID ) { return crossContigIgnoreSet.contains(contigID); }
@@ -301,8 +311,12 @@ public class ReadMetadata {
         return readGroupToLibraryMap;
     }
 
-    public static void writeMetadata( final ReadMetadata readMetadata,
-                                      final String filename ) {
+    public SVReadFilter getSvReadFilter() {
+        return svReadFilter;
+    }
+
+    public static void writeMetadata(final ReadMetadata readMetadata,
+                                     final String filename ) {
         try ( final Writer writer =
                       new BufferedWriter(new OutputStreamWriter(BucketUtils.createFile(filename))) ) {
             writer.write("#reads:\t" + readMetadata.getNReads() + "\n");

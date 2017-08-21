@@ -48,17 +48,14 @@ public class BreakpointEvidenceTest extends BaseTest {
 
         read.setIsReverseStrand(true);
         final BreakpointEvidence evidence2 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-//        final BreakpointEvidence evidence4 =
-//                new BreakpointEvidence.ReadEvidence(read, readMetadata, readStart+readSize+uncertainty, uncertainty, ! read.isReverseStrand());
-//        Assert.assertEquals(evidence2.toString(), evidence4.toString());
 
         final int evidenceLocus2 = read.getStart() - 1 - uncertainty;
         Assert.assertEquals(evidence2.getLocation(), new SVInterval(0,evidenceLocus2-uncertainty,evidenceLocus2+ uncertainty + (evidenceWidth % 2 == 0 ? 0 : 1)));
         Assert.assertEquals(evidence2.getLocation().getLength(), 2*uncertainty + (evidenceWidth % 2 == 0 ? 0 : 1));
 
         read.setAttribute("MD", "149AT");
-        final BreakpointEvidence evidence5 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
-        Assert.assertEquals(evidence2.getLocation().getStart(), evidence5.getLocation().getStart());
+        final BreakpointEvidence evidence3 = new BreakpointEvidence.ReadEvidence(read, readMetadata);
+        Assert.assertEquals(evidence2.getLocation().getStart(), evidence3.getLocation().getStart());
 
 
     }

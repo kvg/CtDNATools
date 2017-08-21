@@ -373,7 +373,7 @@ public class BreakpointEvidence {
         }
 
         private boolean isHighQualityMapping(final ReadMetadata readMetadata, final int mapQ, final SVInterval saInterval) {
-            return mapQ >= 20 &&
+            return mapQ >= readMetadata.getSvReadFilter().getMinEvidenceMapQ() &&
                     (saInterval.getContig() == getLocation().getContig() ||
                     (!readMetadata.ignoreCrossContigID(saInterval.getContig()) && !readMetadata.ignoreCrossContigID(getLocation().getContig())))
                     && ! saInterval.overlaps(getLocation());
@@ -600,12 +600,17 @@ public class BreakpointEvidence {
 
         @Override
         public boolean hasDistalTargets(final ReadMetadata readMetadata) {
-            return targetQuality >= 20 && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig());
+            return isTargetHighQuality(readMetadata);
+        }
+
+        private boolean isTargetHighQuality(final ReadMetadata readMetadata) {
+            return targetQuality >= readMetadata.getSvReadFilter().getMinEvidenceMapQ()
+                    && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig());
         }
 
         @Override
         public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata) {
-            if (targetQuality >= 20 && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig())) {
+            if (isTargetHighQuality(readMetadata)) {
                 return Collections.singletonList(target);
             } else {
                 return Collections.emptyList();
@@ -614,7 +619,7 @@ public class BreakpointEvidence {
 
         @Override
         public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
-            if (targetQuality >= 20 && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig())) {
+            if (isTargetHighQuality(readMetadata)) {
                 return Collections.singletonList(targetForwardStrand);
             } else {
                 return Collections.emptyList();

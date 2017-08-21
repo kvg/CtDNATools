@@ -27,13 +27,11 @@ public class EvidenceTargetLinkClusterer {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
             if (nextEvidence.hasDistalTargets(readMetadata)) {
                 final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
-                System.err.println(toBedpeString(nextEvidence, nextEvidence.getLocation(), target, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-                        ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + (nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence ? "DRP" : "SR"), 1));
                 EvidenceTargetLink updatedLink = null;
                 for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.overlappers(nextEvidence.getLocation()); it.hasNext(); ) {
                     final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();
                     final EvidenceTargetLink oldLink = sourceIntervalEntry.getValue();
-                    // todo: what to do if there are more than one distal targets
+                    // todo: what to do if there are more than one distal targets -- for now just taking the first one
                     if (nextEvidence.hasDistalTargets(readMetadata) &&
                             strandsMatch(nextEvidence.isForwardStrand(), sourceIntervalEntry.getValue().sourceForwardStrand)
                         && (nextEvidence.getDistalTargets(readMetadata).get(0).overlaps(oldLink.target) &&
@@ -50,8 +48,6 @@ public class EvidenceTargetLinkClusterer {
                                             ? oldLink.splitReads : oldLink.splitReads + 1,
                                     nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
                                             ? oldLink.readPairs + 1 : oldLink.readPairs);
-                            //System.err.println("updating to: " + toBedpeString(nextEvidence, newSource, newTarget, ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-//                                    ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + "_" + updatedLink.splitReads + "_" + updatedLink.readPairs, 1));
                             break;
                     }
                 }
@@ -65,8 +61,6 @@ public class EvidenceTargetLinkClusterer {
                                     ? 0 : 1,
                             nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
                                     ? 1 : 0);
-                    //System.err.println("creating new: " + toBedpeString(nextEvidence, nextEvidence.getLocation(), nextEvidence.getDistalTargets(readMetadata).get(0), ((BreakpointEvidence.ReadEvidence) nextEvidence).getTemplateName() +
-                    //        ((BreakpointEvidence.ReadEvidence) nextEvidence).getFragmentOrdinal() + "_" + updatedLink.splitReads + "_" + updatedLink.readPairs, 1));
                 }
                 currentIntervalsWithTargets.put(updatedLink.source, updatedLink);
             }
@@ -77,13 +71,6 @@ public class EvidenceTargetLinkClusterer {
         }
 
         return links.iterator();
-    }
-
-    public String toBedpeString(final BreakpointEvidence nextEvidence, final SVInterval source, final SVInterval target, final String id, final int score) {
-        return "21" + "\t" + (source.getStart() - 1) + "\t" + source.getEnd() +
-                "\t" + "21" + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() + "\t"  +
-                id + "\t" +
-                score + "\t" + (nextEvidence.isForwardStrand() ? "+" : "-") + "\t" + (nextEvidence.getDistalTargetStrands(readMetadata).get(0) ? "+" : "-");
     }
 
     private static boolean strandsMatch(final Boolean forwardStrand1, final Boolean forwardStrand2) {
