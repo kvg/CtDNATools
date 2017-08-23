@@ -51,17 +51,15 @@ public class EvidenceTargetLink {
     }
 
     public String toBedpeString(ReadMetadata readMetadata) {
-        final Map<Integer, String> contigIdToContigNameMap =
-                readMetadata.getContigNameMap().entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
-        return contigIdToContigNameMap.get(source.getContig()) + "\t" + (source.getStart() - 1) + "\t" + source.getEnd() +
-                "\t" + contigIdToContigNameMap.get(target.getContig()) + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() +
-                "\t"  + getId(contigIdToContigNameMap) + "\t" +
+        return readMetadata.getContigName(source.getContig()) + "\t" + (source.getStart() - 1) + "\t" + source.getEnd() +
+                "\t" + readMetadata.getContigName(target.getContig()) + "\t" + (target.getStart() - 1) + "\t" + target.getEnd() +
+                "\t"  + getId(readMetadata) + "\t" +
                 (readPairs + splitReads) + "\t" + (sourceForwardStrand ? "+" : "-") + "\t" + (targetForwardStrand ? "+" : "-");
     }
 
-    private String getId(final Map<Integer, String> contigIdToContigNameMap) {
-        return contigIdToContigNameMap.get(source.getContig()) + "_" + (source.getStart() - 1) + "_" + source.getEnd() +
-                "_" + contigIdToContigNameMap.get(target.getContig()) + "_" + (target.getStart() - 1) + "_" + target.getEnd() +
+    private String getId(final ReadMetadata readMetadata) {
+        return readMetadata.getContigName(source.getContig()) + "_" + (source.getStart() - 1) + "_" + source.getEnd() +
+                "_" + readMetadata.getContigName(target.getContig()) + "_" + (target.getStart() - 1) + "_" + target.getEnd() +
                 "_" + (sourceForwardStrand ? "P" : "M")  + (targetForwardStrand ? "P" : "M") + "_" + splitReads + "_" + readPairs;
     }
 

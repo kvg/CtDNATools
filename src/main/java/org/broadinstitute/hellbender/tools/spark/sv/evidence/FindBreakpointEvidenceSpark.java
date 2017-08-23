@@ -642,7 +642,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
 
         log("Collected " + evidenceTargetLinks.size() + " evidence target links", logger);
 
-        writeTargetLinks(params, broadcastMetadata, evidenceTargetLinks);
+        writeTargetLinks(broadcastMetadata, evidenceTargetLinks, params.targetLinkFile);
 
         final JavaRDD<BreakpointEvidence> filteredEvidenceRDD =
                 evidenceRDD
@@ -727,20 +727,20 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         return new Tuple2<>(intervals, evidenceTargetLinks);
     }
 
-    private static void writeTargetLinks(final FindBreakpointEvidenceSparkArgumentCollection params, final Broadcast<ReadMetadata> broadcastMetadata, final List<EvidenceTargetLink> targetLinks) {
-        if ( params.targetLinkFile != null ) {
+    private static void writeTargetLinks(final Broadcast<ReadMetadata> broadcastMetadata, final List<EvidenceTargetLink> targetLinks, final String targetLinkFile) {
+        if ( targetLinkFile != null ) {
             try (final OutputStreamWriter writer =
-                         new OutputStreamWriter(new BufferedOutputStream(BucketUtils.createFile(params.targetLinkFile)))) {
+                         new OutputStreamWriter(new BufferedOutputStream(BucketUtils.createFile(targetLinkFile)))) {
                 targetLinks.iterator().forEachRemaining(entry -> {
                     final String bedpeRecord = entry.toBedpeString(broadcastMetadata.getValue());
                     try {
                         writer.write(bedpeRecord + "\n");
                     } catch (final IOException ioe) {
-                        throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
+                        throw new GATKException("Can't write target links to "+ targetLinkFile, ioe);
                     }
                 });
             } catch ( final IOException ioe ) {
-                throw new GATKException("Can't write target links to "+params.targetLinkFile, ioe);
+                throw new GATKException("Can't write target links to "+ targetLinkFile, ioe);
             }
         }
     }

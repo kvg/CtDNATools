@@ -34,20 +34,22 @@ public class EvidenceTargetLinkClusterer {
                     // todo: what to do if there are more than one distal targets -- for now just taking the first one
                     if (nextEvidence.hasDistalTargets(readMetadata) &&
                             strandsMatch(nextEvidence.isForwardStrand(), sourceIntervalEntry.getValue().sourceForwardStrand)
-                        && (nextEvidence.getDistalTargets(readMetadata).get(0).overlaps(oldLink.target) &&
-                                strandsMatch(nextEvidence.getDistalTargetStrands(readMetadata).get(0), oldLink.targetForwardStrand))) {
-                            // if it does, intersect the source and target intervals to refine the link
-                            it.remove();
-                            final SVInterval newSource = sourceIntervalEntry.getInterval().intersect(nextEvidence.getLocation());
-                            final SVInterval newTarget = oldLink.target.intersect(nextEvidence.getDistalTargets(readMetadata).get(0));
-                            updatedLink = new EvidenceTargetLink(newSource,
-                                    oldLink.sourceForwardStrand,
-                                    newTarget,
-                                    oldLink.targetForwardStrand,
-                                    nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? oldLink.splitReads : oldLink.splitReads + 1,
-                                    nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
-                                            ? oldLink.readPairs + 1 : oldLink.readPairs);
+                            && (nextEvidence.getDistalTargets(readMetadata).get(0).overlaps(oldLink.target) &&
+                            strandsMatch(nextEvidence.getDistalTargetStrands(readMetadata).get(0), oldLink.targetForwardStrand))) {
+                        // if it does, intersect the source and target intervals to refine the link
+                        it.remove();
+                        final SVInterval newSource = sourceIntervalEntry.getInterval().intersect(nextEvidence.getLocation());
+                        final SVInterval newTarget = oldLink.target.intersect(nextEvidence.getDistalTargets(readMetadata).get(0));
+                        int newSplitReadCount = nextEvidence instanceof BreakpointEvidence.SplitRead
+                                ? oldLink.splitReads + 1 : oldLink.splitReads;
+                        int newReadPairCount = nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
+                                ? oldLink.readPairs + 1 : oldLink.readPairs;
+                        updatedLink = new EvidenceTargetLink(newSource,
+                                oldLink.sourceForwardStrand,
+                                newTarget,
+                                oldLink.targetForwardStrand,
+                                newSplitReadCount,
+                                newReadPairCount);
                             break;
                     }
                 }
