@@ -26,7 +26,6 @@ public class EvidenceTargetLinkClusterer {
         while (breakpointEvidenceIterator.hasNext()) {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
             if (nextEvidence.hasDistalTargets(readMetadata)) {
-                final SVInterval target = nextEvidence.getDistalTargets(readMetadata).get(0);
                 EvidenceTargetLink updatedLink = null;
                 for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.overlappers(nextEvidence.getLocation()); it.hasNext(); ) {
                     final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();

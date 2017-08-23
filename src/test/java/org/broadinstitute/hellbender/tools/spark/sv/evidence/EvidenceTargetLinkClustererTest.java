@@ -113,14 +113,25 @@ public class EvidenceTargetLinkClustererTest {
         entries = EvidenceTargetLinkClusterer.deduplicateTargetLinks(evidenceTargetLinks);
         Assert.assertEquals(entries.size(), 3);
         iterator = entries.iterator();
-
         next = iterator.next();
         Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 100, 200), false, new SVInterval(0, 800, 900), true, 7, 8));
-
         next = iterator.next();
         Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 125, 400), false, new SVInterval(0, 500, 600), false, 5, 5));
-
         next = iterator.next();
         Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 200), true, new SVInterval(0, 550, 600), false, 4, 2));
+
+
+        evidenceTargetLinks.add(new EvidenceTargetLink(new SVInterval(0, 525, 560), false, new SVInterval(0, 100, 175), true, 2, 3));
+        entries = EvidenceTargetLinkClusterer.deduplicateTargetLinks(evidenceTargetLinks);
+
+        Assert.assertEquals(entries.size(), 3);
+        iterator = entries.iterator();
+        next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 100, 200), false, new SVInterval(0, 800, 900), true, 7, 8));
+        next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 125, 400), false, new SVInterval(0, 500, 600), false, 5, 5));
+        next = iterator.next();
+        Assert.assertEquals(next, new EvidenceTargetLink(new SVInterval(0, 150, 175), true, new SVInterval(0, 550, 560), false, 6, 3));
+
     }
 }
