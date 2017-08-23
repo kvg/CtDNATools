@@ -29,7 +29,8 @@ import java.util.HashSet;
                 "-I /path/to/my/dir/longReads.sam \\" +
                 "-O /path/to/my/dir/output.sam \\" +
                 "--readNameFile /path/to/my/dir/readNames.txt",
-        programGroup = StructuralVariationSparkProgramGroup.class)
+        programGroup = StructuralVariationSparkProgramGroup.class,
+        omitFromCommandLine = true)
 @BetaFeature
 public final class ExtractOriginalSAMRecordsByNameSpark extends GATKSparkTool {
     private static final long serialVersionUID = 1L;
