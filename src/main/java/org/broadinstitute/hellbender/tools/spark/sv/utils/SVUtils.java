@@ -1,6 +1,5 @@
 package org.broadinstitute.hellbender.tools.spark.sv.utils;
 
-import com.google.cloud.dataflow.sdk.options.PipelineOptions;
 import htsjdk.samtools.Cigar;
 import htsjdk.samtools.CigarElement;
 import htsjdk.samtools.SAMSequenceDictionary;
@@ -265,12 +264,11 @@ public final class SVUtils {
      * independently.
      */
     public static JavaRDD<byte[]> getRefRDD(final JavaSparkContext ctx,
-                                             final int kSize,
-                                             final ReferenceMultiSource ref,
-                                             final PipelineOptions options,
-                                             final SAMSequenceDictionary readsDict,
-                                             final int ref_record_len,
-                                             final int ref_records_per_partition) {
+                                            final int kSize,
+                                            final ReferenceMultiSource ref,
+                                            final SAMSequenceDictionary readsDict,
+                                            final int ref_record_len,
+                                            final int ref_records_per_partition) {
         final SAMSequenceDictionary dict = ref.getReferenceSequenceDictionary(readsDict);
         if ( dict == null ) throw new GATKException("No reference dictionary available");
 
@@ -281,7 +279,7 @@ public final class SVUtils {
             final int seqLen = rec.getSequenceLength();
             final SimpleInterval interval = new SimpleInterval(seqName, 1, seqLen);
             try {
-                final byte[] bases = ref.getReferenceBases(options, interval).getBases();
+                final byte[] bases = ref.getReferenceBases(null, interval).getBases();
                 for ( int start = 0; start < seqLen; start += effectiveRecLen ) {
                     sequenceChunks.add(Arrays.copyOfRange(bases, start, Math.min(start+ref_record_len, seqLen)));
                 }

@@ -1,6 +1,5 @@
 package org.broadinstitute.hellbender.tools.spark.sv.discovery;
 
-import com.google.cloud.dataflow.sdk.options.PipelineOptions;
 import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.CigarOperator;
 import htsjdk.samtools.SAMFileHeader;
@@ -89,7 +88,7 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
                 .getAlignedContigs();
 
         discoverVariantsAndWriteVCF(parsedContigAlignments, discoverStageArgs.fastaReference,
-                ctx.broadcast(getReference()), getAuthenticatedGCSOptions(), vcfOutputFileName, localLogger);
+                ctx.broadcast(getReference()), vcfOutputFileName, localLogger);
     }
 
     public static final class SAMFormattedContigAlignmentParser extends AlignedContigGenerator implements Serializable {
@@ -167,8 +166,9 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
      * turn into annotated {@link VariantContext}'s, and writes them to VCF.
      */
     public static void discoverVariantsAndWriteVCF(final JavaRDD<AlignedContig> alignedContigs,
-                                                   final String fastaReference, final Broadcast<ReferenceMultiSource> broadcastReference,
-                                                   final PipelineOptions pipelineOptions, final String vcfFileName,
+                                                   final String fastaReference,
+                                                   final Broadcast<ReferenceMultiSource> broadcastReference,
+                                                   final String vcfFileName,
                                                    final Logger toolLogger) {
 
         final JavaRDD<VariantContext> annotatedVariants =
@@ -181,7 +181,7 @@ public final class DiscoverVariantsFromContigAlignmentsSAMSpark extends GATKSpar
                         .map(noveltyTypeAndEvidence -> annotateVariant(noveltyTypeAndEvidence._1,                                     // annotate the novel adjacency and inferred type
                                 noveltyTypeAndEvidence._2._1, noveltyTypeAndEvidence._2._2, broadcastReference));
 
-        SVVCFWriter.writeVCF(pipelineOptions, vcfFileName, fastaReference, annotatedVariants, toolLogger);
+        SVVCFWriter.writeVCF(vcfFileName, fastaReference, annotatedVariants, toolLogger);
     }
 
     // TODO: 7/6/17 interface to be changed in the new implementation, where one contig produces a set of NARL's.

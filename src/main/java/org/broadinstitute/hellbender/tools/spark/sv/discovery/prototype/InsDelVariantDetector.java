@@ -40,7 +40,7 @@ final class InsDelVariantDetector implements VariantDetectorFromLocalAssemblyCon
                         .map(noveltyTypeAndEvidence -> DiscoverVariantsFromContigAlignmentsSAMSpark.annotateVariant(noveltyTypeAndEvidence._1,
                                 noveltyTypeAndEvidence._2._1, noveltyTypeAndEvidence._2._2, broadcastReference));
 
-        SVVCFWriter.writeVCF(null, vcfOutputFileName, fastaReference, annotatedVariants, toolLogger);
+        SVVCFWriter.writeVCF(vcfOutputFileName, fastaReference, annotatedVariants, toolLogger);
     }
 
     /**

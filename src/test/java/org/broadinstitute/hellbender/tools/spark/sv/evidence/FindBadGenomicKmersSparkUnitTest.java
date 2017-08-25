@@ -82,7 +82,7 @@ public class FindBadGenomicKmersSparkUnitTest extends BaseTest {
         }
 
         final List<SVKmer> badKmers =
-                FindBadGenomicKmersSpark.findBadGenomicKmers(ctx, KMER_SIZE, Integer.MAX_VALUE, ref, null, null);
+                FindBadGenomicKmersSpark.findBadGenomicKmers(ctx, KMER_SIZE, Integer.MAX_VALUE, ref, null);
         final Set<SVKmer> badKmerSet = new HashSet<>(badKmers);
         Assert.assertEquals(badKmers.size(), badKmerSet.size());
         Assert.assertEquals(badKmerSet, kmerMap.keySet());
