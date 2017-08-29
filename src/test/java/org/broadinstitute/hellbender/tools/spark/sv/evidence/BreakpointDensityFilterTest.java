@@ -70,7 +70,8 @@ public class BreakpointDensityFilterTest extends BaseTest {
     public void testGetBreakpointClusters(final List<BreakpointEvidence> evidenceList) {
 
         BreakpointDensityFilter breakpointDensityFilter =
-                new BreakpointDensityFilter(evidenceList.iterator(), readMetadata, 3, 3, emptyCrossingChecker);
+                new BreakpointDensityFilter(evidenceList.iterator(), readMetadata, 3,
+                        3, emptyCrossingChecker, 20);
 
         Assert.assertFalse(breakpointDensityFilter.hasEnoughOverlappers(evidenceList.get(0).getLocation()));
         Assert.assertFalse(breakpointDensityFilter.hasEnoughOverlappers(evidenceList.get(1).getLocation()));
@@ -91,7 +92,8 @@ public class BreakpointDensityFilterTest extends BaseTest {
     public void testGetBreakpointClustersWithCoherentEvidence(final List<BreakpointEvidence> evidenceList) {
 
         BreakpointDensityFilter breakpointDensityFilter =
-                new BreakpointDensityFilter(evidenceList.iterator(), readMetadata, 5, 3, emptyCrossingChecker);
+                new BreakpointDensityFilter(evidenceList.iterator(), readMetadata, 5,
+                        3, emptyCrossingChecker, 20);
 
         Assert.assertFalse(breakpointDensityFilter.hasEnoughOverlappers(evidenceList.get(0).getLocation()));
         Assert.assertFalse(breakpointDensityFilter.hasEnoughOverlappers(evidenceList.get(1).getLocation()));
@@ -183,7 +185,8 @@ public class BreakpointDensityFilterTest extends BaseTest {
         allPartitions.addAll(actualList1Clustered);
         allPartitions.addAll(actualList2Clustered);
         BreakpointDensityFilter breakpointDensityFilter =
-                new BreakpointDensityFilter(allPartitions.iterator(), readMetadata, 3, 3, emptyCrossingChecker);
+                new BreakpointDensityFilter(allPartitions.iterator(), readMetadata, 3,
+                        3, emptyCrossingChecker, 20);
         final List<BreakpointEvidence> actualAllPartitions = new ArrayList<>();
         while ( breakpointDensityFilter.hasNext() ) {
             actualAllPartitions.add(breakpointDensityFilter.next());
@@ -224,7 +227,8 @@ public class BreakpointDensityFilterTest extends BaseTest {
         final PartitionCrossingChecker crossingChecker =
                 new PartitionCrossingChecker(partitionIdx, readMetadata, readMetadata.getMaxMedianFragmentSize());
         BreakpointDensityFilter breakpointDensityFilter =
-                new BreakpointDensityFilter(inputList.iterator(), readMetadata, 3, 3, crossingChecker);
+                new BreakpointDensityFilter(inputList.iterator(), readMetadata, 3,
+                        3, crossingChecker, 20);
         final List<BreakpointEvidence> actualList = new ArrayList<>();
         while ( breakpointDensityFilter.hasNext() ) {
             actualList.add(breakpointDensityFilter.next());

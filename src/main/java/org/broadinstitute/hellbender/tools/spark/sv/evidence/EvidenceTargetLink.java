@@ -6,12 +6,13 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.PairedStrandedIntervals;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVInterval;
+import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @DefaultSerializer(EvidenceTargetLink.Serializer.class)
-public class EvidenceTargetLink {
+public final class EvidenceTargetLink {
     private static final SVInterval.Serializer intervalSerializer = new SVInterval.Serializer();
 
     final SVInterval source;
@@ -22,6 +23,8 @@ public class EvidenceTargetLink {
     final int readPairs;
 
     public EvidenceTargetLink(final SVInterval source, final boolean sourceForwardStrand, final SVInterval target, final boolean targetForwardStrand, final int splitReads, final int readPairs) {
+        Utils.validateArg(source != null, "Can't construct EvidenceTargetLink with null source interval");
+        Utils.validateArg(target != null, "Can't construct EvidenceTargetLink with null target interval");
         this.source = source;
         this.sourceForwardStrand = sourceForwardStrand;
         this.target = target;
@@ -90,15 +93,15 @@ public class EvidenceTargetLink {
         if (targetForwardStrand != link.targetForwardStrand) return false;
         if (splitReads != link.splitReads) return false;
         if (readPairs != link.readPairs) return false;
-        if (source != null ? !source.equals(link.source) : link.source != null) return false;
-        return target != null ? target.equals(link.target) : link.target == null;
+        if (!source.equals(link.source)) return false;
+        return target.equals(link.target);
     }
 
     @Override
     public int hashCode() {
-        int result = source != null ? source.hashCode() : 0;
+        int result = source.hashCode();
         result = 31 * result + (sourceForwardStrand ? 1 : 0);
-        result = 31 * result + (target != null ? target.hashCode() : 0);
+        result = 31 * result + target.hashCode();
         result = 31 * result + (targetForwardStrand ? 1 : 0);
         result = 31 * result + splitReads;
         result = 31 * result + readPairs;

@@ -10,7 +10,6 @@ import htsjdk.samtools.SAMReadGroupRecord;
 import htsjdk.samtools.SAMSequenceRecord;
 import org.apache.spark.api.java.JavaRDD;
 import org.broadinstitute.hellbender.exceptions.GATKException;
-import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.tools.spark.utils.IntHistogram;
 import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
@@ -21,7 +20,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * A bag of data about reads:  contig name to id mapping, fragment length statistics by read group, mean length.
@@ -41,7 +39,6 @@ public class ReadMetadata {
     private final int coverage;
     private final PartitionBounds[] partitionBounds;
     private final Map<String, LibraryStatistics> libraryToFragmentStatistics;
-    private final SVReadFilter svReadFilter;
     private final static String NO_GROUP = "NoGroup";
 
     public ReadMetadata( final Set<Integer> crossContigIgnoreSet,
@@ -85,7 +82,6 @@ public class ReadMetadata {
         libraryToFragmentStatistics = new HashMap<>(SVUtils.hashMapCapacity(combinedMaps.size()));
         combinedMaps.forEach( (libName, rawStats) ->
                 libraryToFragmentStatistics.put(libName,rawStats.createLibraryStatistics(nRefBases)));
-        this.svReadFilter = filter;
     }
 
     /** This constructor is for testing only.  It applies a single LibraryStatistics object to all libraries. */
@@ -108,7 +104,6 @@ public class ReadMetadata {
         for ( final SAMReadGroupRecord readGroupRecord : header.getReadGroups() ) {
             libraryToFragmentStatistics.put(readGroupRecord.getLibrary(), stats);
         }
-        this.svReadFilter = new SVReadFilter(new StructuralVariationDiscoveryArgumentCollection.FindBreakpointEvidenceSparkArgumentCollection());
     }
 
     private ReadMetadata( final Kryo kryo, final Input input ) {
@@ -156,8 +151,6 @@ public class ReadMetadata {
             libraryToFragmentStatistics.put(libraryName, stats);
         }
 
-        final SVReadFilter.Serializer serializer = new SVReadFilter.Serializer();
-        svReadFilter = serializer.read(kryo, input, SVReadFilter.class);
     }
 
     private void serialize( final Kryo kryo, final Output output ) {
@@ -196,8 +189,6 @@ public class ReadMetadata {
             statsSerializer.write(kryo, output, entry.getValue());
         }
 
-        final SVReadFilter.Serializer serializer = new SVReadFilter.Serializer();
-        serializer.write(kryo, output, svReadFilter);
     }
 
     public boolean ignoreCrossContigID( final int contigID ) { return crossContigIgnoreSet.contains(contigID); }
@@ -309,10 +300,6 @@ public class ReadMetadata {
             readGroupToLibraryMap.put(groupRecord.getId(), groupRecord.getLibrary());
         }
         return readGroupToLibraryMap;
-    }
-
-    public SVReadFilter getSvReadFilter() {
-        return svReadFilter;
     }
 
     public static void writeMetadata(final ReadMetadata readMetadata,

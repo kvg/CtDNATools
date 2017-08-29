@@ -57,7 +57,7 @@ public class BreakpointEvidence {
      * Returns true if this piece of evidence specifies a possible distal target for the breakpoint.
      * @param readMetadata
      */
-    public boolean hasDistalTargets(final ReadMetadata readMetadata) {
+    public boolean hasDistalTargets(final ReadMetadata readMetadata, final int minEvidenceMapq) {
         return false;
     }
 
@@ -67,7 +67,7 @@ public class BreakpointEvidence {
      * read. Returns null if the evidence does not specify or support a possible targeted region (for example, the case
      * of an read with an unmapped mate).
      */
-    public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata) {
+    public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata, final int minEvidenceMapq) {
         return null;
     }
 
@@ -75,7 +75,7 @@ public class BreakpointEvidence {
      * Returns the strands of the distal target intervals
      * @param readMetadata
      */
-    public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
+    public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata, final int minEvidenceMapq) {
         return null;
     }
 
@@ -353,17 +353,17 @@ public class BreakpointEvidence {
         }
 
         @Override
-        public boolean hasDistalTargets(final ReadMetadata readMetadata) {
-            return tagSA != null && hasHighQualityMappings(readMetadata);
+        public boolean hasDistalTargets(final ReadMetadata readMetadata, final int minEvidenceMapq) {
+            return tagSA != null && hasHighQualityMappings(readMetadata, minEvidenceMapq);
         }
 
-        private boolean hasHighQualityMappings(final ReadMetadata readMetadata) {
+        private boolean hasHighQualityMappings(final ReadMetadata readMetadata, final int minEvidenceMapq) {
             boolean hqMappingFound = false;
             if (saMappings != null) {
                 for (final SAMapping mapping : saMappings) {
                     final int mapQ = mapping.getMapq();
                     SVInterval saInterval = saMappingToSVInterval(readMetadata, mapping);
-                    if (isHighQualityMapping(readMetadata, mapQ, saInterval)) {
+                    if (isHighQualityMapping(readMetadata, mapQ, saInterval, minEvidenceMapq)) {
                         hqMappingFound = true;
                         break;
                     }
@@ -372,21 +372,21 @@ public class BreakpointEvidence {
             return hqMappingFound;
         }
 
-        private boolean isHighQualityMapping(final ReadMetadata readMetadata, final int mapQ, final SVInterval saInterval) {
-            return mapQ >= readMetadata.getSvReadFilter().getMinEvidenceMapQ() &&
+        private boolean isHighQualityMapping(final ReadMetadata readMetadata, final int mapQ, final SVInterval saInterval, final int minEvidenceMapq) {
+            return mapQ >= minEvidenceMapq &&
                     (saInterval.getContig() == getLocation().getContig() ||
                     (!readMetadata.ignoreCrossContigID(saInterval.getContig()) && !readMetadata.ignoreCrossContigID(getLocation().getContig())))
                     && ! saInterval.overlaps(getLocation());
         }
 
         @Override
-        public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata) {
+        public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata, final int minEvidenceMapq) {
             if (saMappings != null) {
                 List<SVInterval> supplementaryAlignments = new ArrayList<>(saMappings.size());
                 for (final SAMapping saMapping : saMappings) {
                     final int mapQ = saMapping.getMapq();
                     SVInterval saInterval = saMappingToSVInterval(readMetadata, saMapping);
-                    if (! isHighQualityMapping(readMetadata, mapQ, saInterval)) {
+                    if (! isHighQualityMapping(readMetadata, mapQ, saInterval, minEvidenceMapq)) {
                         continue;
                     }
                     supplementaryAlignments.add(saInterval);
@@ -398,13 +398,13 @@ public class BreakpointEvidence {
         }
 
         @Override
-        public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
+        public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata, final int minEvidenceMapq) {
             if (saMappings != null) {
                 final List<Boolean> supplementaryAlignmentStrands = new ArrayList<>(saMappings.size());
                 for (final SAMapping saMapping : saMappings) {
                     final int mapQ = saMapping.getMapq();
                     SVInterval saInterval = saMappingToSVInterval(readMetadata, saMapping);
-                    if (! isHighQualityMapping(readMetadata, mapQ, saInterval)) {
+                    if (! isHighQualityMapping(readMetadata, mapQ, saInterval, minEvidenceMapq)) {
                         continue;
                     }
                     final boolean result = calculateDistalTargetStrand(saMapping, isForwardStrand());
@@ -599,18 +599,18 @@ public class BreakpointEvidence {
         }
 
         @Override
-        public boolean hasDistalTargets(final ReadMetadata readMetadata) {
-            return isTargetHighQuality(readMetadata);
+        public boolean hasDistalTargets(final ReadMetadata readMetadata, final int minEvidenceMapq) {
+            return isTargetHighQuality(readMetadata, minEvidenceMapq);
         }
 
-        private boolean isTargetHighQuality(final ReadMetadata readMetadata) {
-            return targetQuality >= readMetadata.getSvReadFilter().getMinEvidenceMapQ()
+        private boolean isTargetHighQuality(final ReadMetadata readMetadata, final int minEvidenceMapq) {
+            return targetQuality >= minEvidenceMapq
                     && ! target.overlaps(getLocation()) && ! readMetadata.ignoreCrossContigID(target.getContig());
         }
 
         @Override
-        public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata) {
-            if (isTargetHighQuality(readMetadata)) {
+        public List<SVInterval> getDistalTargets(final ReadMetadata readMetadata, final int minEvidenceMapq) {
+            if (isTargetHighQuality(readMetadata, minEvidenceMapq)) {
                 return Collections.singletonList(target);
             } else {
                 return Collections.emptyList();
@@ -618,8 +618,8 @@ public class BreakpointEvidence {
         }
 
         @Override
-        public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata) {
-            if (isTargetHighQuality(readMetadata)) {
+        public List<Boolean> getDistalTargetStrands(final ReadMetadata readMetadata, final int minEvidenceMapq) {
+            if (isTargetHighQuality(readMetadata, minEvidenceMapq)) {
                 return Collections.singletonList(targetForwardStrand);
             } else {
                 return Collections.emptyList();

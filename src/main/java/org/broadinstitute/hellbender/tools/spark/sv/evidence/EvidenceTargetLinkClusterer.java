@@ -15,9 +15,11 @@ import java.util.stream.Collectors;
 public class EvidenceTargetLinkClusterer {
 
     private final ReadMetadata readMetadata;
+    private final int minEvidenceMapq;
 
-    public EvidenceTargetLinkClusterer(final ReadMetadata readMetadata) {
+    public EvidenceTargetLinkClusterer(final ReadMetadata readMetadata, final int minEvidenceMapq) {
         this.readMetadata = readMetadata;
+        this.minEvidenceMapq = minEvidenceMapq;
     }
 
     public Iterator<EvidenceTargetLink> cluster(final Iterator<BreakpointEvidence> breakpointEvidenceIterator) throws Exception {
@@ -25,20 +27,23 @@ public class EvidenceTargetLinkClusterer {
         final SVIntervalTree<EvidenceTargetLink> currentIntervalsWithTargets = new SVIntervalTree<>();
         while (breakpointEvidenceIterator.hasNext()) {
             final BreakpointEvidence nextEvidence = breakpointEvidenceIterator.next();
-            if (nextEvidence.hasDistalTargets(readMetadata)) {
+            if (nextEvidence.hasDistalTargets(readMetadata, minEvidenceMapq)) {
+                Utils.validate(nextEvidence instanceof BreakpointEvidence.SplitRead || nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence,
+                        "Unknown evidence type with distal target: " + nextEvidence);
                 EvidenceTargetLink updatedLink = null;
                 for (final Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.overlappers(nextEvidence.getLocation()); it.hasNext(); ) {
                     final SVIntervalTree.Entry<EvidenceTargetLink> sourceIntervalEntry = it.next();
                     final EvidenceTargetLink oldLink = sourceIntervalEntry.getValue();
                     // todo: what to do if there are more than one distal targets -- for now just taking the first one
-                    if (nextEvidence.hasDistalTargets(readMetadata) &&
+                    // this would only be an issue with split reads with more than one SA mapping
+                    if (nextEvidence.hasDistalTargets(readMetadata, minEvidenceMapq) &&
                             strandsMatch(nextEvidence.isForwardStrand(), sourceIntervalEntry.getValue().sourceForwardStrand)
-                            && (nextEvidence.getDistalTargets(readMetadata).get(0).overlaps(oldLink.target) &&
-                            strandsMatch(nextEvidence.getDistalTargetStrands(readMetadata).get(0), oldLink.targetForwardStrand))) {
+                            && (nextEvidence.getDistalTargets(readMetadata, minEvidenceMapq).get(0).overlaps(oldLink.target) &&
+                            strandsMatch(nextEvidence.getDistalTargetStrands(readMetadata, minEvidenceMapq).get(0), oldLink.targetForwardStrand))) {
                         // if it does, intersect the source and target intervals to refine the link
                         it.remove();
                         final SVInterval newSource = sourceIntervalEntry.getInterval().intersect(nextEvidence.getLocation());
-                        final SVInterval newTarget = oldLink.target.intersect(nextEvidence.getDistalTargets(readMetadata).get(0));
+                        final SVInterval newTarget = oldLink.target.intersect(nextEvidence.getDistalTargets(readMetadata, minEvidenceMapq).get(0));
                         int newSplitReadCount = nextEvidence instanceof BreakpointEvidence.SplitRead
                                 ? oldLink.splitReads + 1 : oldLink.splitReads;
                         int newReadPairCount = nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
@@ -56,8 +61,8 @@ public class EvidenceTargetLinkClusterer {
                     updatedLink = new EvidenceTargetLink(
                             nextEvidence.getLocation(),
                             nextEvidence.isForwardStrand(),
-                            nextEvidence.getDistalTargets(readMetadata).get(0),
-                            nextEvidence.getDistalTargetStrands(readMetadata).get(0),
+                            nextEvidence.getDistalTargets(readMetadata, minEvidenceMapq).get(0),
+                            nextEvidence.getDistalTargetStrands(readMetadata, minEvidenceMapq).get(0),
                             nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
                                     ? 0 : 1,
                             nextEvidence instanceof BreakpointEvidence.DiscordantReadPairEvidence
@@ -67,9 +72,7 @@ public class EvidenceTargetLinkClusterer {
             }
         }
 
-        for (Iterator<SVIntervalTree.Entry<EvidenceTargetLink>> it = currentIntervalsWithTargets.iterator(); it.hasNext(); ) {
-            links.add(it.next().getValue());
-        }
+        currentIntervalsWithTargets.forEach(entry -> links.add(entry.getValue()));
 
         return links.iterator();
     }

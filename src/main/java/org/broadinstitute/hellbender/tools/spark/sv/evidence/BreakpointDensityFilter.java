@@ -23,6 +23,7 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
     private final int minCoherentEvidenceWeight;
     private final PartitionCrossingChecker partitionCrossingChecker;
     private final SVIntervalTree<List<BreakpointEvidence>> evidenceTree;
+    private final int minEvidenceMapq;
     private Iterator<SVIntervalTree.Entry<List<BreakpointEvidence>>> treeItr;
     private Iterator<BreakpointEvidence> listItr;
 
@@ -30,7 +31,8 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
                                     final ReadMetadata readMetadata,
                                     final int minEvidenceWeight,
                                     final int minCoherentEvidenceWeight,
-                                    final PartitionCrossingChecker partitionCrossingChecker ) {
+                                    final PartitionCrossingChecker partitionCrossingChecker,
+                                    final int minEvidenceMapq) {
         this.readMetadata = readMetadata;
         this.minEvidenceWeight = minEvidenceWeight;
         this.minCoherentEvidenceWeight = minCoherentEvidenceWeight;
@@ -38,6 +40,7 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
         this.evidenceTree = buildTree(evidenceItr);
         this.treeItr = evidenceTree.iterator();
         this.listItr = null;
+        this.minEvidenceMapq = minEvidenceMapq;
     }
 
     @Override
@@ -99,13 +102,13 @@ public final class BreakpointDensityFilter implements Iterator<BreakpointEvidenc
             }
 
             for (final BreakpointEvidence evidence : evidenceForInterval) {
-                if (evidence.hasDistalTargets(readMetadata)) {
-                    final List<SVInterval> distalTargets = evidence.getDistalTargets(readMetadata);
+                if (evidence.hasDistalTargets(readMetadata, minEvidenceMapq)) {
+                    final List<SVInterval> distalTargets = evidence.getDistalTargets(readMetadata, minEvidenceMapq);
                     for (int i = 0; i < distalTargets.size(); i++) {
                         targetIntervalTree.put(
                                 new PairedStrandedIntervals(
                                         evidence.getLocation(), evidence.isForwardStrand(),
-                                        distalTargets.get(i), evidence.getDistalTargetStrands(readMetadata).get(i)),
+                                        distalTargets.get(i), evidence.getDistalTargetStrands(readMetadata, minEvidenceMapq).get(i)),
                                 evidence
                                 );
                     }

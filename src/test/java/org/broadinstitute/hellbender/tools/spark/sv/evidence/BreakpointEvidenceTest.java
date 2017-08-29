@@ -101,10 +101,10 @@ public class BreakpointEvidenceTest extends BaseTest {
 
         final BreakpointEvidence.SplitRead splitRead = new BreakpointEvidence.SplitRead(read, metadata, false);
         Assert.assertTrue(splitRead.isForwardStrand());
-        Assert.assertTrue(splitRead.hasDistalTargets(metadata));
-        final SVInterval targetInterval = splitRead.getDistalTargets(metadata).get(0);
+        Assert.assertTrue(splitRead.hasDistalTargets(metadata, 20));
+        final SVInterval targetInterval = splitRead.getDistalTargets(metadata, 20).get(0);
         Assert.assertEquals(targetInterval, new SVInterval(0, 140828198, 140828274));
-        Assert.assertFalse(splitRead.getDistalTargetStrands(metadata).get(0));
+        Assert.assertFalse(splitRead.getDistalTargetStrands(metadata, 20).get(0));
     }
 
     @Test(groups = "sv")
@@ -117,10 +117,10 @@ public class BreakpointEvidenceTest extends BaseTest {
 
         final BreakpointEvidence.SplitRead splitRead = new BreakpointEvidence.SplitRead(read, metadata, true);
         Assert.assertFalse(splitRead.isForwardStrand());
-        Assert.assertTrue(splitRead.hasDistalTargets(metadata));
-        final SVInterval targetInterval = splitRead.getDistalTargets(metadata).get(0);
+        Assert.assertTrue(splitRead.hasDistalTargets(metadata, 20));
+        final SVInterval targetInterval = splitRead.getDistalTargets(metadata, 20).get(0);
         Assert.assertEquals(targetInterval, new SVInterval(0, 140825510, 140825571));
-        Assert.assertTrue(splitRead.getDistalTargetStrands(metadata).get(0));
+        Assert.assertTrue(splitRead.getDistalTargetStrands(metadata, 20).get(0));
     }
 
     @Test(groups = "sv")
@@ -134,10 +134,10 @@ public class BreakpointEvidenceTest extends BaseTest {
 
         final BreakpointEvidence.SplitRead splitRead = new BreakpointEvidence.SplitRead(read, metadata, true);
         Assert.assertFalse(splitRead.isForwardStrand());
-        Assert.assertTrue(splitRead.hasDistalTargets(metadata));
-        final SVInterval targetInterval = splitRead.getDistalTargets(metadata).get(0);
+        Assert.assertTrue(splitRead.hasDistalTargets(metadata, 20));
+        final SVInterval targetInterval = splitRead.getDistalTargets(metadata, 20).get(0);
         Assert.assertEquals(targetInterval, new SVInterval(0, 140825477, 140825571));
-        Assert.assertTrue(splitRead.getDistalTargetStrands(metadata).get(0));
+        Assert.assertTrue(splitRead.getDistalTargetStrands(metadata, 20).get(0));
     }
 
     @Test(groups = "sv")
