@@ -91,15 +91,16 @@ public final class AlignmentInterval {
         final int alignmentScore = parts.length >= 7 ? Integer.parseInt(parts[6]) : -1;
         this.referenceSpan = new SimpleInterval(referenceContig, start,
                 Math.max(start, CigarUtils.referenceBasesConsumed(cigar) + start - 1));
-        this.startInAssembledContig = 1 + CigarUtils.leftHardClippedBases(cigar);
-        this.endInAssembledContig = CigarUtils.readLength(cigar)
-                - CigarUtils.leftHardClippedBases(cigar);
+        this.startInAssembledContig = 1 + CigarUtils.countLeftHardClippedBases(cigar);
+        this.endInAssembledContig = CigarUtils.countUnclippedReadBases(cigar)
+                - CigarUtils.countLeftHardClippedBases(cigar);
         this.mapQual = mappingQuality;
         this.mismatches = mismatches;
         this.alnScore = alignmentScore;
         this.forwardStrand = forwardStrand;
         this.cigarAlong5to3DirectionOfContig = cigar;
         this.isFromSplitGapAlignment = false;
+        this.hasUndergoneOverlapRemoval = false;
     }
 
 
@@ -118,6 +119,7 @@ public final class AlignmentInterval {
         this.mismatches = ReadUtils.getOptionalIntAttribute(samRecord, SAMTag.NM.name()).orElse(MISSING_NM);
         this.alnScore = ReadUtils.getOptionalIntAttribute(samRecord, SAMTag.AS.name()).orElse(MISSING_AS);
         this.isFromSplitGapAlignment = false;
+        this.hasUndergoneOverlapRemoval = false;
     }
 
     /**

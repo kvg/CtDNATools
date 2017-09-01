@@ -456,7 +456,7 @@ public final class CigarUtils {
      * @throws IllegalArgumentException if the input {@code cigar} is {@code null}.
      * @return 0 or greater.
      */
-    public static int readLength(final Cigar cigar) {
+    public static int countUnclippedReadBases(final Cigar cigar) {
         Utils.nonNull(cigar, "the input cigar cannot be null");
         return cigar.getCigarElements().stream()
                 .filter(ce -> {
@@ -492,7 +492,7 @@ public final class CigarUtils {
      * @throws IllegalArgumentException if {@code cigar} is {@code null}.
      * @return 0 or greater.
      */
-    public static int leftClippedBases(final Cigar cigar) {
+    public static int countLeftClippedBases(final Cigar cigar) {
         Utils.nonNull(cigar, "the input cigar cannot not be null");
         int result = 0;
         for (final CigarElement e : cigar) {
@@ -511,7 +511,7 @@ public final class CigarUtils {
      * @throws IllegalArgumentException if {@code cigar} is {@code null}.
      * @return 0 or greater.
      */
-    public static int leftHardClippedBases(final Cigar cigar) {
+    public static int countLeftHardClippedBases(final Cigar cigar) {
         Utils.nonNull(cigar, "the input cigar cannot not be null");
         if (cigar.isEmpty()) {
             return 0;
@@ -532,7 +532,7 @@ public final class CigarUtils {
      * @throws IllegalArgumentException if {@code cigar} is {@code null}.
      * @return 0 or greater.
      */
-    public static int rightHardClippedBases(final Cigar cigar) {
+    public static int countRightHardClippedBases(final Cigar cigar) {
         Utils.nonNull(cigar, "the input cigar cannot not be null");
         final List<CigarElement> elements = cigar.getCigarElements();
         if (elements.size() < 2) {
@@ -556,7 +556,7 @@ public final class CigarUtils {
      * @throws IllegalArgumentException if {@code cigar} is {@code null}
      * @return 0 or greater.
      */
-    public static int rightClippedBases(final Cigar cigar) {
+    public static int countRightClippedBases(final Cigar cigar) {
         Utils.nonNull(cigar, "the input cigar cannot be null");
         final List<CigarElement> elements = cigar.getCigarElements();
         if (elements.size() < 2) {  // a single clipped element would be considered a left-clip so it must have at least
