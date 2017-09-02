@@ -4,6 +4,8 @@ import htsjdk.samtools.*;
 import htsjdk.variant.variantcontext.StructuralVariantType;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFConstants;
+import org.apache.avro.ipc.MD5;
+import org.apache.hadoop.io.MD5Hash;
 import org.broadinstitute.hellbender.engine.datasources.ReferenceMultiSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -39,6 +41,12 @@ public final class StructuralVariantContext extends VariantContext {
      * Indicates that the variant does not have a length or this could not be determined.
      */
     public static final int NO_LENGTH = -1;
+
+    /**
+     * Holds the unique id for this structural variant. A {@link null} indicates that the ID has not yet been
+     * calculated.
+     */
+    public String uid = null;
 
     private int end = MISSING_END;
     private int length = MISSING_LENGTH;
@@ -292,5 +300,29 @@ public final class StructuralVariantContext extends VariantContext {
                 Math.max(1, padding > 0 ? start - padding + 1 : start),
                 Math.min(contigSize, end + padding));
 
+    }
+
+    public String getUniqueID() {
+        if (uid == null) {
+            uid = composeUniqueID();
+        }
+        return uid;
+    }
+
+    /**
+     * Is not 100% certain that is unique for INS (uses a checksum of the inserted sequence), but is nearly certainly so.
+     */
+    private String composeUniqueID() {
+        final StringBuilder builder = new StringBuilder(50);
+        builder.append("sv/");
+        builder.append(getStructuralVariantType().name().toLowerCase()).append('/');
+        switch (getStructuralVariantType()) {
+            case INS: builder.append("dg:").append(Integer.toHexString(MD5Hash.digest(getInsertedSequence()).quarterDigest())); break;
+            case DEL: builder.append("ln:").append(getStructuralVariantLength()); break;
+            default:
+                throw new UnsupportedOperationException("not yet supported type: " + getStructuralVariantType());
+        }
+        builder.append('/').append(getContig()).append(':').append(getStart());
+        return builder.toString();
     }
 }
