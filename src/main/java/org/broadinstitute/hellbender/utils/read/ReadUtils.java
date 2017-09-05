@@ -1191,7 +1191,7 @@ public final class ReadUtils {
         } else {
             final List<CigarElement> cigarElements = read.getCigarElements();
             if (cigarElements.isEmpty()) {
-                throw new IllegalArgumentException("the input read is mapped yet contains no cigar-elements");
+                throw new IllegalArgumentException("the input read is mapped yet contains no cigar-elements: " + read.commonToString());
             }
             int result = 0;
             for (final CigarElement ce : cigarElements) {
@@ -1203,6 +1203,7 @@ public final class ReadUtils {
                     result += length;
                 }
             }
+            // reachable if the input read's cigar core-operations (non-clipping ones) consist only of a I operation which is considered valid as per GATKRead#isValid:
             return -1;
         }
     }

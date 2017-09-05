@@ -703,11 +703,11 @@ public final class ReadUtilsUnitTest extends BaseTest {
 
     @DataProvider(name="gatkReadsData")
     public Object[][] gatkReadsData() {
-        final Cigar[] randomCigars = Stream.of(CigarUtilsUnitTest.randomValidCigars()).map(x -> (Cigar) x[0]).toArray(Cigar[]::new);
-        final List<Object[]> result = new ArrayList<>(randomCigars.length);
-        final SAMFileHeader header = ArtificialReadUtils.createArtificialSamHeader();
-        final RandomDNA rdnDna = new RandomDNA(11);
         final Random rdn = new Random(17);
+        final RandomDNA rdnDna = new RandomDNA(11);
+        final List<Cigar> randomCigars = CigarTestUtils.randomValidCigars(rdn, 1_000, 10, 100);
+        final List<Object[]> result = new ArrayList<>(randomCigars.size());
+        final SAMFileHeader header = ArtificialReadUtils.createArtificialSamHeader();
         for (final Cigar cigar : randomCigars) {
             final SAMRecord record = new SAMRecord(header);
             record.setReadUnmappedFlag(cigar.isEmpty());
