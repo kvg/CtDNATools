@@ -13,6 +13,7 @@ import org.broadinstitute.hellbender.tools.exome.*;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.internal.junit.ArrayAsserts;
 
@@ -58,34 +59,30 @@ public class TargetCoverageSexGenotypeCalculatorUnitTest extends BaseTest {
     private static final long RANDOM_SEED = 1984;
     private static final double EPSILON = 1e-12;
 
-    private static final List<ContigGermlinePloidyAnnotation> HOMO_SAPIENS_GERMLINE_CONTIG_PLOIDY_ANNOTATIONS;
-    static {
-        HOMO_SAPIENS_GERMLINE_CONTIG_PLOIDY_ANNOTATIONS = ContigGermlinePloidyAnnotationTableReader
-                .readContigGermlinePloidyAnnotationsFromFile(TEST_CONTIG_PLOIDY_ANNOTS_FILE);
-    }
+    private static List<ContigGermlinePloidyAnnotation> HOMO_SAPIENS_GERMLINE_CONTIG_PLOIDY_ANNOTATIONS;
 
     private static final List<Target> RANDOM_TARGETS_WITH_BAIT_COUNTS = annotateTargetsWithRandomBaitCounts(
             generateRandomTargets(new Random(RANDOM_SEED)), new Random(RANDOM_SEED));
     private static final List<Target> RANDOM_TARGETS_WITHOUT_BAIT_COUNTS = generateRandomTargets(new Random(RANDOM_SEED));
 
-    private static final ReadCountCollection RANDOM_READ_COUNTS_WITH_BAIT_BIAS;
-    private static final List<String> TRUTH_SEX_GENOTYPES_WITH_BAIT_BIAS;
+    private static ReadCountCollection RANDOM_READ_COUNTS_WITH_BAIT_BIAS;
+    private static List<String> TRUTH_SEX_GENOTYPES_WITH_BAIT_BIAS;
 
-    private static final ReadCountCollection RANDOM_READ_COUNTS_WITHOUT_BAIT_BIAS;
-    private static final List<String> TRUTH_SEX_GENOTYPES_WITHOUT_BAIT_BIAS;
+    private static ReadCountCollection RANDOM_READ_COUNTS_WITHOUT_BAIT_BIAS;
+    private static List<String> TRUTH_SEX_GENOTYPES_WITHOUT_BAIT_BIAS;
 
-    static {
-        final ImmutablePair<List<String>, ReadCountCollection> randomData = generateRandomReadCountCollection(
+    @BeforeClass
+    public void before() {
+        HOMO_SAPIENS_GERMLINE_CONTIG_PLOIDY_ANNOTATIONS = ContigGermlinePloidyAnnotationTableReader
+                .readContigGermlinePloidyAnnotationsFromFile(TEST_CONTIG_PLOIDY_ANNOTS_FILE);
+        final ImmutablePair<List<String>, ReadCountCollection> randomDataWithBaits = generateRandomReadCountCollection(
                 RANDOM_TARGETS_WITH_BAIT_COUNTS, NUMBER_OF_RANDOM_SAMPLES, new Well19937c(RANDOM_SEED), true);
-        RANDOM_READ_COUNTS_WITH_BAIT_BIAS = randomData.getRight();
-        TRUTH_SEX_GENOTYPES_WITH_BAIT_BIAS = randomData.getLeft();
-    }
-
-    static {
-        final ImmutablePair<List<String>, ReadCountCollection> randomData = generateRandomReadCountCollection(
+        RANDOM_READ_COUNTS_WITH_BAIT_BIAS = randomDataWithBaits.getRight();
+        TRUTH_SEX_GENOTYPES_WITH_BAIT_BIAS = randomDataWithBaits.getLeft();
+        final ImmutablePair<List<String>, ReadCountCollection> randomDataWithoutBaits = generateRandomReadCountCollection(
                 RANDOM_TARGETS_WITHOUT_BAIT_COUNTS, NUMBER_OF_RANDOM_SAMPLES, new Well19937c(RANDOM_SEED), false);
-        RANDOM_READ_COUNTS_WITHOUT_BAIT_BIAS = randomData.getRight();
-        TRUTH_SEX_GENOTYPES_WITHOUT_BAIT_BIAS = randomData.getLeft();
+        RANDOM_READ_COUNTS_WITHOUT_BAIT_BIAS = randomDataWithoutBaits.getRight();
+        TRUTH_SEX_GENOTYPES_WITHOUT_BAIT_BIAS = randomDataWithoutBaits.getLeft();
     }
 
     /**
