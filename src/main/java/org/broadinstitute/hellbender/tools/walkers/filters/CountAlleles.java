@@ -29,6 +29,9 @@ public class CountAlleles extends LocusWalker {
     @Argument(fullName = StandardArgumentDefinitions.OUTPUT_LONG_NAME, shortName = StandardArgumentDefinitions.OUTPUT_SHORT_NAME, doc = "Output file (if not provided, defaults to STDOUT)", common = false, optional = true)
     private File OUTPUT_FILE = null;
 
+    @Argument(fullName="auxiliaryVariants", shortName="av", doc="Auxiliary set of variants", optional=true)
+    private FeatureInput<VariantContext> auxiliaryVariants;
+
     private PrintStream outputStream = null;
 
     @Override
@@ -43,9 +46,21 @@ public class CountAlleles extends LocusWalker {
 
     @Override
     public void apply(AlignmentContext alignmentContext, final ReferenceContext referenceContext, FeatureContext featureContext) {
+        if ( featureContext.hasBackingDataSource() ) {
+            printVariants(featureContext);
+        }
+
         int[] counts = alignmentContext.getBasePileup().getBaseCounts();
 
         outputStream.println(referenceContext.getInterval().getContig() + " " + referenceContext.getInterval().getStart() + " " + counts[0] + " " + counts[1] + " " + counts[2] + " " + counts[3]);
+    }
+
+    private void printVariants( final FeatureContext featureContext ) {
+        for ( final VariantContext variant : featureContext.getValues(auxiliaryVariants) ) {
+            outputStream.printf("\tOverlapping variant at %s:%d-%d. Ref: %s Alt(s): %s\n",
+                    variant.getContig(), variant.getStart(), variant.getEnd(), variant.getReference(), variant.getAlternateAlleles());
+        }
+        outputStream.println();
     }
 
     @Override
