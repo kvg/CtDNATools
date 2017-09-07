@@ -60,7 +60,7 @@ public class CountAlleles extends VariantWalker {
 
                 String seenAllele = read.getBasesString().substring(offsetStart, offsetEnd);
 
-                outputStream.println(refAllele + " " + altAllele + " " + seenAllele + " " + variant.getContig() + " " + variant.getStart() + " " + read.getAssignedStart() + " " + offsetStart + " " + read.getBasesString());
+                outputStream.println(refAllele + " " + altAllele + " " + seenAllele + " " + variant.getContig() + " " + variant.getStart() + " " + read.getAssignedStart() + " " + offsetStart + " " + read);
 
                 if (altAllele.getDisplayString().equals(seenAllele)) {
                     altCount++;
