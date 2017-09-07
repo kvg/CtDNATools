@@ -39,6 +39,8 @@ public class CountAlleles extends LocusWalker {
         catch ( FileNotFoundException e ) {
             throw new UserException.CouldNotReadInputFile(OUTPUT_FILE, e);
         }
+
+        outputStream.println("CHROM POS REF ALT ALT_COUNT TOT_COUNT AF");
     }
 
     @Override
@@ -57,7 +59,9 @@ public class CountAlleles extends LocusWalker {
 
                     int totalCount = counts[0] + counts[1] + counts[2] + counts[3];
 
-                    outputStream.println(referenceContext.getInterval().getContig() + " " + referenceContext.getInterval().getStart() + " " + vc.getReference() + " " + vc.getAltAlleleWithHighestAlleleCount() + " " + altCount + " " + totalCount);
+                    double af = 100.0 * (double) altCount / (double) totalCount;
+
+                    outputStream.println(referenceContext.getInterval().getContig() + " " + referenceContext.getInterval().getStart() + " " + vc.getReference().getBaseString() + " " + vc.getAltAlleleWithHighestAlleleCount() + " " + altCount + " " + totalCount + " " + af);
                 }
             }
         }
