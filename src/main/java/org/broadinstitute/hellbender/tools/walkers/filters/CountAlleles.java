@@ -48,7 +48,16 @@ public class CountAlleles extends LocusWalker {
                 if (vc.getFilters().isEmpty()) {
                     int[] counts = alignmentContext.getBasePileup().getBaseCounts();
 
-                    outputStream.println(referenceContext.getInterval().getContig() + " " + referenceContext.getInterval().getStart() + " " + counts[0] + " " + counts[1] + " " + counts[2] + " " + counts[3]);
+                    int altCount = 0;
+                    String alt = vc.getAltAlleleWithHighestAlleleCount().getBaseString();
+                    if (alt.equals("A")) { altCount = counts[0]; }
+                    if (alt.equals("C")) { altCount = counts[1]; }
+                    if (alt.equals("G")) { altCount = counts[2]; }
+                    if (alt.equals("T")) { altCount = counts[3]; }
+
+                    int totalCount = counts[0] + counts[1] + counts[2] + counts[3];
+
+                    outputStream.println(referenceContext.getInterval().getContig() + " " + referenceContext.getInterval().getStart() + " " + vc.getReference() + " " + vc.getAltAlleleWithHighestAlleleCount() + " " + altCount + " " + totalCount);
                 }
             }
         }
