@@ -3,7 +3,10 @@ package org.broadinstitute.hellbender.tools.walkers.filters;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.broadinstitute.barclay.argparser.Argument;
+import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
+import org.broadinstitute.barclay.help.DocumentedFeature;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
+import org.broadinstitute.hellbender.cmdline.programgroups.ReadProgramGroup;
 import org.broadinstitute.hellbender.engine.*;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
@@ -15,6 +18,12 @@ import java.io.PrintStream;
 /**
  * Created by kiran on 07/09/2017.
  */
+@CommandLineProgramProperties(
+        summary = "Count alleles",
+        oneLineSummary = "Count alleles",
+        programGroup = ReadProgramGroup.class
+)
+@DocumentedFeature
 public class CountAlleles extends VariantWalker {
     @Argument(fullName = StandardArgumentDefinitions.OUTPUT_LONG_NAME, shortName = StandardArgumentDefinitions.OUTPUT_SHORT_NAME, doc = "Output file (if not provided, defaults to STDOUT)", common = false, optional = true)
     private File outputFile = null;
