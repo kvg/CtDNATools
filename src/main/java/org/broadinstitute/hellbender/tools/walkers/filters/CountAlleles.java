@@ -45,7 +45,7 @@ public class CountAlleles extends VariantWalker {
 
     @Override
     public void apply(final VariantContext variant, final ReadsContext readsContext, final ReferenceContext referenceContext, final FeatureContext featureContext) {
-        //Allele refAllele = variant.getReference();
+        Allele refAllele = variant.getReference();
         Allele altAllele = variant.getAltAlleleWithHighestAlleleCount();
 
         int altCount = 0;
@@ -59,7 +59,7 @@ public class CountAlleles extends VariantWalker {
 
             String seenAllele = read.getBasesString().substring(offsetStart, offsetEnd);
 
-            outputStream.println(altAllele + " " + seenAllele + " " + variant.getStart() + " " + read.getAssignedStart() + " " + read.getBasesString());
+            outputStream.println(refAllele + " " + altAllele + " " + seenAllele + " " + variant.getStart() + " " + read.getAssignedStart() + " " + offsetStart + " " + read.getBasesString());
 
             if (altAllele.getDisplayString().equals(seenAllele)) {
                 altCount++;
